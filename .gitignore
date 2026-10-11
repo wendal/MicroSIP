@@ -1,0 +1,28 @@
+# MSBuild / Visual Studio
+.vs/
+Debug/
+Release/
+x64/
+x86/
+ARM64/
+*.user
+*.aps
+*.pdb
+*.ilk
+*.obj
+*.idb
+*.tlog
+*.log
+*.lastbuildstate
+*.sdf
+
+# Build outputs
+*.exe
+*.dll
+*.lib
+*.exp
+*.res
+
+# OS noise
+Thumbs.db
+desktop.ini
