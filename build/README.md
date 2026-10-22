@@ -4,8 +4,8 @@ This directory contains the complete build pipeline. Everything it needs is
 inside the repository — no other checkout, no downloads.
 
 ```powershell
-git clone <this repository>
-cd MicroSIP-3.22.16-src
+git clone git@gitee.com:wendal/microsip.git
+cd microsip
 .\build\build.ps1
 ```
 

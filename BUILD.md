@@ -45,10 +45,12 @@ MicroSIP-3.22.16-src\
 A clone plus one command is enough — nothing is downloaded while building:
 
 ```powershell
-git clone <repository>
-cd MicroSIP-3.22.16-src
+git clone git@gitee.com:wendal/microsip.git
+cd microsip
 .\build\build.ps1
 ```
+
+(The same repository is also pushed to `git@github.com:wendal/MicroSIP.git`.)
 
 ---
 
