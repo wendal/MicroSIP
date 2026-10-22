@@ -24,11 +24,36 @@
 #include <pjsua-lib/pjsua.h>
 #include <pjsua-lib/pjsua_internal.h>
 
-#ifdef NDEBUG
-#pragma comment(lib, "libpjproject-i386-Win32-vc14-Release-Static.lib")
+// The pjproject static library is bound by name, and upstream hardcodes the
+// 32-bit artefact. Make the selection architecture aware so the x64 build
+// links libpjproject-x86_64-x64-vc14-*.lib instead. The library is built
+// from stock upstream pjproject 2.14.1 - see BUILD.md section 9.
+#if defined(_M_X64)
+  #ifdef NDEBUG
+    #pragma comment(lib, "libpjproject-x86_64-x64-vc14-Release-Static.lib")
+  #else
+    #pragma comment(lib, "libpjproject-x86_64-x64-vc14-Debug-Static.lib")
+  #endif
 #else
-#pragma comment(lib, "libpjproject-i386-Win32-vc14-Debug-Static.lib")
+  #ifdef NDEBUG
+    #pragma comment(lib, "libpjproject-i386-Win32-vc14-Release-Static.lib")
+  #else
+    #pragma comment(lib, "libpjproject-i386-Win32-vc14-Debug-Static.lib")
+  #endif
 #endif
+
+// The Opus codec lives in opus.lib and is referenced from inside
+// libpjproject (pjmedia-codec/opus.c). The pragma makes the dependency
+// explicit and guarantees the archive is on the link line. Two things matter
+// here:
+//   * opus.lib must be the one for THIS platform and configuration. The
+//     MicroSIP source release ships an x86 copy in third_party\lib, which is
+//     searched before third_party\opus\$(Platform)\$(Configuration)\ - that
+//     x86 archive wins and the x64 references stay unresolved. See BUILD.md
+//     section 11.3.
+//   * its CRT has to match the configuration (Debug /MTd, Release /MT),
+//     otherwise LNK4098 reports a default library conflict.
+#pragma comment(lib, "opus.lib")
 
 #include "MMNotificationClient.h"
 
