@@ -59,6 +59,9 @@ archive has to match the configuration that links it, and the shared
 * pjproject — GPL-2.0 (or a commercial licence from Teluu)
 * OpenSSL — Apache-2.0
 * Opus — BSD-3-Clause
-* bcg729 — see the upstream repository
+* bcg729 — GPL-2.0
 * SQLiteCpp — MIT (bundles SQLite, public domain)
 * MicroSIP itself — GPL-2.0
+
+The licence texts themselves are collected verbatim in `third_party\LICENSES\`,
+and the application's own licence is `LICENSE` in the repository root.

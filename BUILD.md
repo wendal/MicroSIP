@@ -266,9 +266,12 @@ opus, sqlite3 and MFC are all statically linked in.
 ## 8. Licensing note
 
 The prebuilt pjsip static library and `opus.lib` come from a third-party
-repository that mirrors the author's build tree. `bcg729` is GPLv3 (or a
-commercial licence from Belledonne Communications) — distributing a binary
-built from it carries the corresponding obligations. MicroSIP itself is GPLv2.
+repository that mirrors the author's build tree. `bcg729` is **GPL-2.0** (its
+upstream README says "The source code is licensed under GPLv2", and the
+`COPYING` file in the archive is the GPL version 2 text) — distributing a
+binary built from it carries the corresponding obligations. MicroSIP itself is
+GPLv2. Every vendored licence is collected verbatim in
+`third_party\LICENSES\`.
 
 PJSIP itself is **not** closed source: upstream pjproject is GPLv2 (or, at
 Teluu's option, a commercial licence), and MicroSIP is GPLv2, so the GPLv2
