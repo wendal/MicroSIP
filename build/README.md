@@ -46,8 +46,9 @@ Run a single step with `-Step`:
 ```
 
 Useful switches: `-Platform x64|Win32|All`, `-Configuration Debug|Release|All`,
-`-NoSsl` (skip the OpenSSL/TLS backend), `-Force` (rebuild everything instead
-of reusing the cached archives).
+`-NoSsl` (skip the OpenSSL/TLS backend), `-BuildSslWin32` (build OpenSSL for
+Win32 as well — by default it is x64-only, see §12.5 of `BUILD.md`), `-Force`
+(rebuild everything instead of reusing the cached archives).
 
 ## Layout
 
@@ -88,6 +89,7 @@ third_party\         the dependency tree, see third_party\README.md
 .\tools\verify-app.ps1 -Exe .\x64\Debug\microsip.exe   # starts the app and checks it
 .\tools\verify-openssl.ps1 -Configuration Debug         # static OpenSSL self test
 .\tools\verify-tls.ps1 -Configuration Debug              # creates a real SIP-over-TLS transport
+.\tools\verify-manifest.ps1                             # checks the vendored archives against their SHA-256
 .\tools\verify-pjproject-provenance.ps1                  # checks the headers against upstream
 ```
 

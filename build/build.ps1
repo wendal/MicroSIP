@@ -36,6 +36,7 @@ param(
     [ValidateSet('x64', 'Win32', 'All')][string]$Platform = 'All',
     [ValidateSet('all', 'check', 'prepare', 'thirdparty', 'pjproject', 'app')][string]$Step = 'all',
     [switch]$NoSsl,
+    [switch]$BuildSslWin32,
     [switch]$Force,
     [switch]$SkipToolchainCheck
 )
@@ -76,6 +77,7 @@ if ($all -or $Step -eq 'prepare') {
 if ($all -or $Step -eq 'thirdparty') {
     $extra = @('-RepoRoot', $repoRoot, '-Platform', $Platform, '-Configuration', $Configuration)
     if ($NoSsl) { $extra += '-NoSsl' }
+    if ($BuildSslWin32) { $extra += '-BuildSslWin32' }
     if ($Force) { $extra += '-Force' }
     Run-Step '02-thirdparty.ps1' $extra
     if ($Step -eq 'thirdparty') { exit 0 }

@@ -148,7 +148,8 @@ $lines = @(
 )
 foreach ($f in Get-ChildItem $src -File | Sort-Object Name) {
     $hash = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower()
-    $lines += ("{0}  {1}" -f $hash, $f.Name)
+    # every path in the manifest is relative to third_party\
+    $lines += ("{0}  src/{1}" -f $hash, $f.Name)
 }
 $lines += ''
 $lines += '# prebuilt libraries'

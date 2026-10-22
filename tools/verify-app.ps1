@@ -4,7 +4,7 @@
     up (window, worker threads, call log database) and shut it down.
 
 .EXAMPLE
-    .\verify-app.ps1 -Exe "D:\github\microsip-build\MicroSIP-3.22.16-src\x64\Debug\microsip.exe"
+    .\verify-app.ps1 -Exe .\x64\Debug\microsip.exe
 #>
 [CmdletBinding()]
 param(
@@ -27,11 +27,11 @@ $machine = [BitConverter]::ToUInt16($bytes, $peOff + 4)
 $arch = switch ($machine) { 0x8664 { 'x64' } 0x14c { 'x86' } 0xAA64 { 'ARM64' } default { "0x$('{0:X}' -f $machine)" } }
 "arch  : $arch (PE machine 0x$('{0:X}' -f $machine))"
 
-$work = Split-Path $Exe -Parent
+$work = Split-Path $fi.FullName -Parent
 Push-Location $work
 $p = $null
 try {
-    $p = Start-Process -FilePath $Exe -WorkingDirectory $work -PassThru
+    $p = Start-Process -FilePath $fi.FullName -WorkingDirectory $work -PassThru
     "pid   : $($p.Id)"
     Start-Sleep -Seconds $Seconds
     $p.Refresh()
