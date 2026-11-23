@@ -32,7 +32,7 @@ tool together with the command that installs it:
 | 0 | `steps\00-check-toolchain.ps1` | reports missing tools and how to install them |
 | 1 | `steps\01-prepare.ps1` | unpacks `third_party\src\*.zip` into `build\work\`, stages the third-party headers into `third_party\`, generates `pj\config_site.h` |
 | 2 | `steps\02-thirdparty.ps1` | builds SQLiteCpp, bcg729, opus, OpenSSL and the `chkstk_ms` placeholder — per platform **and** configuration |
-| 3 | `steps\03-pjproject.ps1` | patches and builds the pjproject static library for x64, installs it into `third_party\lib\` |
+| 3 | `steps\03-pjproject.ps1` | patches and builds the pjproject static library for **every** platform, installs it into `third_party\lib\<Platform>\` |
 | 4 | `steps\04-app.ps1` | builds `microsip.vcxproj` |
 
 Run a single step with `-Step`:
@@ -72,7 +72,13 @@ third_party\         the dependency tree, see third_party\README.md
 * **The shared `third_party\lib` must not contain architecture specific
   archives.** It is searched *before* the per-platform folders, so a 32-bit
   `opus.lib` sitting there wins over the 64-bit one and the x64 build fails
-  with unresolved `opus_*` symbols.
+  with unresolved `opus_*` symbols. The pjproject archives therefore go into
+  `third_party\lib\<Platform>\`, never into the shared folder.
+* **The pjproject headers and the pjproject library must come from the same
+  release.** The headers are the flattened form of the vendored archive
+  (`src\pjproject-2.17.zip`) and the library is compiled from that same
+  archive. Nothing is vendored prebuilt — a prebuilt library from an older
+  release would be ABI-incompatible with the headers.
 * **`chkstk_ms.lib` does not exist for x86/x64.** It is an ARM64-only archive,
   but `microsip.vcxproj` lists it in every configuration. `steps\02-thirdparty.ps1`
   generates a tiny placeholder (see `stub\chkstk_ms.c`) instead.

@@ -13,8 +13,7 @@
     Mixing them produces "LINK : warning LNK4098: default library 'libcmt.lib'
     conflicts with other libraries' use" - and, worse, two CRT heaps in one
     process. Upstream never sees this because the archives it ships are never
-    pulled into the link (the prebuilt 32-bit pjproject has neither Opus nor
-    TLS).
+    pulled into the link.
 
     Produced:
         third_party\lib\<Platform>\chkstk_ms.lib
@@ -34,8 +33,9 @@ param(
     [string]$RepoRoot = '',
     [switch]$Force,
     [switch]$NoSsl,
-    # The Win32 application links the vendored 32-bit pjproject library, which
-    # has no TLS backend - OpenSSL is only built for x64 unless this is set.
+    # OpenSSL is only built for x64: the Win32 pjproject is compiled without a
+    # TLS backend (see the #if defined(_M_X64) guard in pj\config_site.h), so
+    # building it for Win32 would cost ~20 minutes for archives nobody links.
     [switch]$BuildSslWin32
 )
 
@@ -228,12 +228,12 @@ foreach ($plat in $platforms) {
     }
     if ($skipSsl) {
         Write-Host ''
-        Write-Host '    The Win32 application links the vendored 32-bit pjproject library,'
-        Write-Host '    which was compiled WITHOUT a TLS backend: it exports neither'
-        Write-Host '    pj_ssl_sock_start_connect nor any OpenSSL symbol. OpenSSL is'
-        Write-Host '    therefore never referenced at link time and building it would'
-        Write-Host '    cost ~20 minutes for archives nobody links. Use -BuildSslWin32'
-        Write-Host '    to build it anyway.'
+        Write-Host '    The Win32 pjproject is compiled WITHOUT a TLS backend, because'
+        Write-Host '    the OpenSSL headers and libraries are not built for that'
+        Write-Host '    platform: it exports neither pj_ssl_sock_start_connect nor any'
+        Write-Host '    OpenSSL symbol. OpenSSL is therefore never referenced at link'
+        Write-Host '    time and building it would cost ~20 minutes for archives nobody'
+        Write-Host '    links. Use -BuildSslWin32 to build it anyway.'
     }
 }
 

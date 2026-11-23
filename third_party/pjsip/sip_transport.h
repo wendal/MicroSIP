@@ -389,7 +389,7 @@ struct pjsip_rx_data
         /** Start of msg buffer. */
         char                    *msg_buf;
 
-        /** Length fo message. */
+        /** Length of message. */
         int                      len;
 
         /** The parsed message, if any. */
@@ -856,6 +856,7 @@ struct pjsip_transport
 
     int                     addr_len;       /**< Length of addresses.       */
     pj_sockaddr             local_addr;     /**< Bound address.             */
+    pj_bool_t               has_addr_name;  /**< Has config published name? */
     pjsip_host_port         local_name;     /**< Published name (eg. STUN). */
     pjsip_host_port         remote_name;    /**< Remote address name.       */
     pjsip_transport_dir     dir;            /**< Connection direction.      */
@@ -1082,6 +1083,7 @@ struct pjsip_tpfactory
     char                   *info;           /**< Transport info/description.*/
 
     pj_sockaddr             local_addr;     /**< Bound address.         */
+    pj_bool_t               has_addr_name;  /**< Has published name?    */
     pjsip_host_port         addr_name;      /**< Published name.        */
 
     /**
@@ -1303,6 +1305,19 @@ PJ_DECL(unsigned) pjsip_tpmgr_get_transport_count(pjsip_tpmgr *mgr);
 
 
 /**
+ * Return number of transports of the specified type currently registered to
+ * the transport manager.
+ *
+ * @param mgr       The transport manager.
+ * @param type      Transport type (can be from pjsip_transport_type_e enum)
+ *
+ * @return          Number of transports.
+ */
+PJ_DECL(unsigned) pjsip_tpmgr_get_transport_count_by_type(pjsip_tpmgr *mgr,
+                                                          int type);
+
+
+/**
  * Destroy a transport manager. Normally application doesn't need to call
  * this function directly, since a transport manager will be created and
  * destroyed automatically by the SIP endpoint.
@@ -1320,6 +1335,53 @@ PJ_DECL(pj_status_t) pjsip_tpmgr_destroy(pjsip_tpmgr *mgr);
  * @param mgr       The transport manager.
  */
 PJ_DECL(void) pjsip_tpmgr_dump_transports(pjsip_tpmgr *mgr);
+
+
+/**
+ * Parameter for pjsip_tpmgr_shutdown_all() function.
+ */
+typedef struct pjsip_tpmgr_shutdown_param
+{
+    /**
+     * Specify whether disconnection state notification should be sent
+     * immediately, see pjsip_transport_shutdown2() for more info.
+     *
+     * Default: PJ_TRUE.
+     */
+    pj_bool_t   force;
+
+    /**
+     * Specify whether UDP transports should also be shutdown.
+     *
+     * Default: PJ_TRUE.
+     */
+    pj_bool_t   include_udp;
+
+} pjsip_tpmgr_shutdown_param;
+
+
+/**
+ * Initialize transports shutdown parameter with default values.
+ *
+ * @param prm       The parameter to be initialized.
+ */
+PJ_DECL(void) pjsip_tpmgr_shutdown_param_default(
+                                    pjsip_tpmgr_shutdown_param *prm);
+
+
+/**
+ * Shutdown all transports. This basically invokes pjsip_transport_shutdown2()
+ * on all transports.
+ *
+ * @param mgr       The transport manager.
+ * @param param     The function parameters.
+ *
+ * @return          PJ_SUCCESS on success.
+ */
+PJ_DECL(pj_status_t) pjsip_tpmgr_shutdown_all(
+                                    pjsip_tpmgr *mgr,
+                                    const pjsip_tpmgr_shutdown_param *param);
+
 
 
 /*****************************************************************************
@@ -1660,6 +1722,58 @@ typedef void (*pjsip_tp_on_rx_dropped_cb)(pjsip_tp_dropped_data *data);
 PJ_DECL(pj_status_t) pjsip_tpmgr_set_drop_data_cb(pjsip_tpmgr *mgr,
                                                   pjsip_tp_on_rx_dropped_cb cb);
 
+
+/**
+ * Structure of received data that will be passed to data received
+ * notification callback.
+ */
+typedef struct pjsip_tp_rx_data
+{
+    /**
+     * The transport receiving the data.
+     */
+    pjsip_transport *tp;
+
+    /**
+     * The data.
+     */
+    void            *data;
+
+    /**
+     * The data length.
+     * If application wishes to discard some data of len p, it can pass
+     * the remaining data back to PJSIP to be processed by setting the len
+     * to (len - p).
+     * If application wants to shutdown the transport from within the
+     * callback (for example after if finds out that the data is
+     * suspicious/garbage), app must set the len to zero to prevent
+     * further processing of the data.
+     */
+    pj_size_t        len;
+
+} pjsip_tp_rx_data;
+
+
+/**
+ * Type of callback to data received notifications.
+ *
+ * @param data      The received data.
+ */
+typedef pj_status_t (*pjsip_tp_on_rx_data_cb)(pjsip_tp_rx_data *data);
+
+
+/**
+ * Set callback to be called whenever any data is received by a stream
+ * oriented transport. This can be useful for application to do its own
+ * verification, filtering, or logging of potential malicious activities.
+ * 
+ * @param mgr       Transport manager.
+ * @param cb        The callback function, set to NULL to reset the callback.
+ *
+ * @return          PJ_SUCCESS on success, or the appropriate error code.
+ */
+PJ_DECL(pj_status_t) pjsip_tpmgr_set_recv_data_cb(pjsip_tpmgr *mgr,
+                                                  pjsip_tp_on_rx_data_cb cb);
 
 /**
  * @}

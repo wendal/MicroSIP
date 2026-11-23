@@ -6,7 +6,7 @@
     Single entry point for the whole pipeline. Everything it needs is inside
     the repository:
 
-        third_party\        pjproject headers + the prebuilt 32-bit library
+        third_party\        pjproject headers
         third_party\src\    source archives for everything that is compiled
                             (git-lfs tracked, so a clone brings them along)
 
@@ -18,7 +18,8 @@
         2  thirdparty        build SQLiteCpp, bcg729, opus, OpenSSL and the
                             chkstk_ms placeholder - per platform and
                             configuration, with the matching CRT
-        3  pjproject         build the pjproject static library for x64
+        3  pjproject         build the pjproject static library for every
+                            platform
         4  app               build microsip.vcxproj
 
     Nothing is downloaded: if third_party\src is empty, run
@@ -85,9 +86,9 @@ if ($all -or $Step -eq 'thirdparty') {
 
 # ---------------------------------------------------------------- step 3
 if ($all -or $Step -eq 'pjproject') {
-    # pjproject is only rebuilt for x64; the Win32 application links the
-    # prebuilt 32-bit library from third_party\lib
-    $extra = @('-RepoRoot', $repoRoot, '-Platform', 'x64')
+    # pjproject is built for every platform - the application links the
+    # library this step produces, there is no vendored prebuilt one any more.
+    $extra = @('-RepoRoot', $repoRoot, '-Platform', $Platform)
     if ($Force) { $extra += '-Rebuild' }
     Run-Step '03-pjproject.ps1' $extra
     if ($Step -eq 'pjproject') { exit 0 }

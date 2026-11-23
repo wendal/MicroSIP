@@ -22,10 +22,11 @@
     identical: the macros decide what is compiled into the library and what the
     application believes the library contains.
 
-    The macros are guarded by #if defined(_M_X64). The x64 library that is
-    built here has Opus and TLS; the prebuilt 32-bit library that ships with
-    MicroSIP was compiled without them, so the Win32 build of the application
-    must see exactly the same macro set as the library it links against.
+    The macros are guarded by #if defined(_M_X64). OpenSSL is only built for
+    x64, so the Win32 pjproject is compiled without a TLS backend - and the
+    Win32 build of the application must see exactly the same macro set as the
+    library it links against. Both platforms are built from the same sources
+    here, so the guard is what keeps the two builds consistent.
 
 .EXAMPLE
     .\01-prepare.ps1
@@ -81,7 +82,7 @@ function Unpack([string]$zipName, [string]$destName, [string]$expect) {
     return $dest
 }
 
-$pjTree = Unpack 'pjproject-2.14.1.zip' 'pjproject-2.14.1' 'pjlib'
+$pjTree = Unpack 'pjproject-2.17.zip' 'pjproject-2.17' 'pjlib'
 $sslTree = Unpack 'openssl-3.0.15.zip' 'openssl-3.0.15' 'include'
 $opusTree = Unpack 'opus-1.3.1.zip' 'opus-1.3.1' 'include'
 $bcgTree = Unpack 'bcg729.zip' 'bcg729' 'include'
@@ -125,27 +126,14 @@ $blockLines += ''
 $blockLines += '/* --- local build configuration (MicroSIP) --- */'
 $blockLines += '#define PJMEDIA_HAS_VIDEO 1'
 $blockLines += ''
-$blockLines += '/* Features that only the locally built x64 pjproject provides. The 32-bit'
-$blockLines += ' * library shipped with MicroSIP was built without them, so the Win32 build'
-$blockLines += ' * must see the same macro set as the library it links against. */'
+$blockLines += '/* Features that only the x64 build provides: OpenSSL is built for x64'
+$blockLines += ' * only, so the Win32 pjproject is compiled without a TLS backend - and'
+$blockLines += ' * the Win32 application must see the same macro set as the library it'
+$blockLines += ' * links against. */'
 $blockLines += '#if defined(_M_X64)'
 foreach ($m in $macros) { $blockLines += "#  define $m 1" }
 $blockLines += '#else'
 foreach ($m in $macros) { $blockLines += "#  define $m 0" }
-$blockLines += '#endif'
-$blockLines += ''
-$blockLines += '/* MicroSIP 3.23.5 sizes its audio device arrays with'
-$blockLines += ' * PJMEDIA_AUD_DEV_MAX_DEVS - the name pjproject adopted in 2.15 for the'
-$blockLines += ' * constant that 2.14.1 calls PJMEDIA_AUD_MAX_DEVS. Both default to 64,'
-$blockLines += ' * so map the new name onto the old one and keep the vendored 2.14.1'
-$blockLines += ' * headers working. pjproject 2.14.1 never uses the new name itself, so'
-$blockLines += ' * this does not change the library that is built from it. */'
-$blockLines += '#ifndef PJMEDIA_AUD_DEV_MAX_DEVS'
-$blockLines += '#  ifdef PJMEDIA_AUD_MAX_DEVS'
-$blockLines += '#    define PJMEDIA_AUD_DEV_MAX_DEVS PJMEDIA_AUD_MAX_DEVS'
-$blockLines += '#  else'
-$blockLines += '#    define PJMEDIA_AUD_DEV_MAX_DEVS 64'
-$blockLines += '#  endif'
 $blockLines += '#endif'
 $block = ($blockLines -join "`r`n") + "`r`n"
 

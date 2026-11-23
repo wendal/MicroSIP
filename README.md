@@ -10,9 +10,9 @@ dependency tree that upstream does not ship:
 > MicroSIP relies on third-party libraries that are **not included in this
 > repository**.
 
-This repository closes that gap. The pjproject headers, every source archive
-and the one prebuilt library live in `third_party\`, and `build\build.ps1`
-compiles the whole thing — no second checkout, no download while building.
+This repository closes that gap. The pjproject headers and every source
+archive live in `third_party\`, and `build\build.ps1` compiles the whole thing —
+no second checkout, no download while building.
 
 ## Quick start
 
@@ -24,7 +24,7 @@ cd microsip
 
 The first run checks the toolchain, unpacks the vendored sources, builds
 SQLiteCpp / bcg729 / opus / OpenSSL, builds the pjproject static library for
-x64 and then the application. It takes about 13 minutes on a current
+x64 and Win32 and then the application. It takes about 25 minutes on a current
 developer machine; every later run reuses what is already there.
 
 Output:
@@ -33,11 +33,10 @@ Output:
 |---|---|
 | `x64\|Debug` | `x64\Debug\microsip.exe` |
 | `x64\|Release` | `x64\Release\microsip.exe` |
-| `Debug\|Win32` | `Debug\microsip.exe` |
+| `Win32\|Debug` | `Debug\microsip.exe` |
+| `Win32\|Release` | `Release\microsip.exe` |
 
-`Release\|Win32` is intentionally skipped — only the Debug flavour of the
-32-bit pjproject library is vendored, and the pipeline says so instead of
-failing.
+All four configurations are built from the same sources; nothing is skipped.
 
 ### Requirements
 
@@ -67,19 +66,21 @@ two features switched on that the official 32-bit release does not have:
 * **SIP over TLS** (`PJ_HAS_SSL_SOCK`, OpenSSL 3.0.15 backend)
 
 Both are guarded by `#if defined(_M_X64)` in `pj\config_site.h`, so the Win32
-build keeps seeing exactly the feature set of the library it links against.
+build keeps seeing exactly the feature set of the library it links against —
+OpenSSL is only built for x64, and the Win32 pjproject is compiled without a
+TLS backend.
 
 ### pjproject version
 
-Upstream MicroSIP 3.23.x ships with **pjproject 2.17**. This repository keeps
-the **2.14.1** tree it has always vendored, because the only prebuilt 32-bit
-library that ships with MicroSIP is a 2.14.1 build and rebuilding pjproject
-for Win32 is out of scope.
+The vendored pjproject is **2.17** — the same release upstream MicroSIP 3.23.x
+ships, and the one the 3.23.5 sources are written against. Every platform is
+compiled from that one archive by `build\steps\03-pjproject.ps1`, so the
+application and the library it links against can never drift apart.
 
-The single API difference that the 3.23.5 sources depend on is the name of a
-compile-time constant: pjproject 2.15 renamed `PJMEDIA_AUD_MAX_DEVS` to
-`PJMEDIA_AUD_DEV_MAX_DEVS`. Both default to 64, so `pj\config_site.h` maps the
-new name onto the old one — see `BUILD.md` §13.
+Nothing is vendored prebuilt any more: the 32-bit library that used to sit in
+`third_party\lib\` was a 2.14.1 build and would have been ABI-incompatible with
+the 2.17 headers. Building Win32 from source removes that trap and makes
+`Release|Win32` possible.
 
 ## Layout
 
@@ -91,7 +92,7 @@ build\          the build pipeline - see build\README.md
   vs\           the upstream pjproject Visual Studio property sheets
 third_party\    the dependency tree - see third_party\README.md
   src\          source archives (git-lfs)
-  lib\          the prebuilt 32-bit pjproject library + the generated x64 ones
+  lib\          build output: the pjproject and helper archives (git-ignored)
   LICENSES\     the licence of every vendored dependency
 tools\          verification scripts (not part of the build)
 BUILD.md        the full story: provenance, the traps, the measurements
@@ -110,11 +111,11 @@ BUILD.md        the full story: provenance, the traps, the measurements
 ## Provenance
 
 The dependency tree is not a private fork. The pjproject headers are
-**byte-identical to upstream pjproject 2.14.1** (305 / 305 files), the
-prebuilt 32-bit library exports **only** upstream symbols (2266, zero
-author-only APIs), and the `build\vs\` property sheets are upstream's own.
-`BUILD.md` §9 documents the verification and `tools\verify-pjproject-provenance.ps1`
-re-runs it.
+**byte-identical to upstream pjproject 2.17** — the flattened tree is a pure
+function of the archive's five include directories, and
+`tools\verify-pjproject-provenance.ps1` re-derives it and compares file by
+file. The `build\vs\` property sheets are upstream's own. `BUILD.md` §9
+documents the verification.
 
 ## Licensing
 

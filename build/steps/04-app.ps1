@@ -8,10 +8,11 @@
     The project file derives its platform toolset from the BuildToolset
     property, so that has to be passed on the command line.
 
-    Note that the Win32 configuration links the *prebuilt* 32-bit pjproject
-    library from third_party\lib - rebuilding pjproject for Win32 is out of
-    scope, and that library has neither Opus nor TLS. The application handles
-    that through the #if defined(_M_X64) guard in pj\config_site.h.
+    Both platforms link the pjproject library that build\steps\03-pjproject.ps1
+    builds - there is no vendored prebuilt library any more. The Win32 build
+    sees PJ_HAS_SSL_SOCK 0 and PJMEDIA_HAS_OPUS_CODEC 0, because OpenSSL is
+    only built for x64; the #if defined(_M_X64) guard in pj\config_site.h
+    keeps the application and the library it links against in sync.
 
 .EXAMPLE
     .\04-app.ps1 -Configuration Debug -Platform x64
@@ -40,20 +41,6 @@ $target = if ($Rebuild) { 'Rebuild' } else { 'Build' }
 
 foreach ($plat in $plats) {
     foreach ($cfg in $cfgs) {
-        # The Win32 application links the *prebuilt* 32-bit pjproject library,
-        # and only the Debug flavour of it is vendored. A Release|Win32 build
-        # would look for libpjproject-i386-Win32-vc14-Release-Static.lib, which
-        # does not exist - skip it with an explanation instead of failing the
-        # whole pipeline with a linker error.
-        if ($plat -eq 'Win32' -and $cfg -eq 'Release') {
-            $rel = Join-Path $RepoRoot 'third_party\lib\libpjproject-i386-Win32-vc14-Release-Static.lib'
-            if (-not (Test-Path $rel)) {
-                Write-Note 'Win32 | Release skipped: only the Debug flavour of the 32-bit'
-                Write-Note '                    pjproject library is vendored. Build pjproject'
-                Write-Note '                    for Win32 yourself to get that configuration.'
-                continue
-            }
-        }
         Write-Host "   $plat|$cfg ..."
         Invoke-MsBuild $proj @("/t:$target", "/p:Configuration=$cfg", "/p:Platform=$plat",
             "/p:BuildToolset=$toolset", '/m', '/v:m', '/nologo') "app $plat|$cfg" | Out-Null

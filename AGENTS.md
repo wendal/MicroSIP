@@ -15,7 +15,7 @@ include paths and the install layout.
 .\build\build.ps1 -Step check                  # toolchain check only
 .\build\build.ps1 -Step prepare                # unpack + stage + config_site.h
 .\build\build.ps1 -Step thirdparty -Platform x64 -Configuration Debug
-.\build\build.ps1 -Step pjproject              # the x64 pjproject library
+.\build\build.ps1 -Step pjproject              # the pjproject library (all platforms)
 .\build\build.ps1 -Step app -Platform x64
 .\build\build.ps1 -Platform x64 -Configuration Release
 ```
@@ -30,7 +30,8 @@ Requirements: Visual Studio 2022/2026 with "Desktop development with C++"
 
 - `build\` — the pipeline: `build.ps1`, `steps\00-check-toolchain.ps1` … `steps\04-app.ps1`, `stub\chkstk_ms.c`, `vs\` (upstream property sheets)
 - `third_party\src\` — source archives, tracked with git-lfs
-- `third_party\lib\` — the prebuilt 32-bit pjproject library + the generated x64 ones
+- `third_party\lib\` — build output only: the pjproject and helper archives the
+  pipeline produces. Nothing in there is vendored.
 - `third_party\pj\`, `third_party\pjsip\`, … — the pjproject headers, flattened (upstream layout)
 - `third_party\LICENSES\` — the licence of every vendored dependency
 - `tools\` — verification scripts; **not** part of the build
@@ -62,10 +63,12 @@ the output.
   The shared `third_party\lib\` is searched *before* the per-platform folders —
   never put an architecture-specific archive there. A 32-bit `opus.lib` there
   breaks the x64 link with unresolved `opus_*` symbols.
-- **The Win32 application links the prebuilt 32-bit pjproject library**, which
-  has no Opus and no TLS backend. `config_site.h` guards both macros with
-  `#if defined(_M_X64)`. OpenSSL is built for x64 only; `Release|Win32` is
-  skipped on purpose.
+- **The Win32 build has neither Opus nor TLS.** OpenSSL is built for x64 only, so
+  the Win32 pjproject is compiled without a TLS backend; `config_site.h` guards
+  `PJ_HAS_SSL_SOCK` and `PJMEDIA_HAS_OPUS_CODEC` with `#if defined(_M_X64)`.
+  Both platforms link the library that `steps\03-pjproject.ps1` builds — there
+  is no vendored prebuilt one, so the application and the library always come
+  from the same pjproject release.
 - **The toolset must be overridden.** Upstream's property sheet hardcodes
   `v140`, which no longer ships. The pipeline passes
   `/p:BuildToolset=<detected>` (`v143` / `v145`).
@@ -80,11 +83,12 @@ the output.
   `libpjproject-i386-…-Static.lib`; the linker then reports `LNK4272` and a
   flood of unresolved `pjsua_*` symbols that have nothing to do with the code.
   When updating from an upstream release, re-apply this block.
-- **The vendored pjproject is 2.14.1; upstream 3.23.x ships 2.17.** The one API
-  difference the 3.23.5 sources depend on is the rename of the compile-time
-  constant `PJMEDIA_AUD_MAX_DEVS` → `PJMEDIA_AUD_DEV_MAX_DEVS` (both 64). The
-  generator maps the new name onto the old one in `pj\config_site.h` — see
-  `BUILD.md` §13.
+- **The vendored pjproject is 2.17 — the version upstream MicroSIP 3.23.x
+  ships.** pjproject 2.15 renamed the compile-time constant
+  `PJMEDIA_AUD_MAX_DEVS` to `PJMEDIA_AUD_DEV_MAX_DEVS` (both 64); 2.17 defines
+  the new name natively in `pjmedia-audiodev/config.h`, so `config_site.h` must
+  **not** alias it — an alias would point at a constant that no longer exists
+  and the build fails. See `BUILD.md` §14.
 - **Source files must keep their UTF-8 BOM.** The machine's ANSI code page is
   936 (GBK). MSVC reads a BOM-less file as ACP, so the `·` (U+00B7) and `–`
   (U+2013) literals in `mainDlg.cpp` are mis-decoded and `C4819` is emitted.
@@ -121,8 +125,8 @@ binary works.
 - Conventional commits: `feat:`, `fix:`, `docs:`, `chore:`
 - Remotes: `gitee` (`git@gitee.com:wendal/microsip.git`) is the primary one,
   `origin` (`git@github.com:wendal/MicroSIP.git`) is a backup
-- The six large files in `third_party\src\` and `third_party\lib\` are
-  **git-lfs** objects — keep the `.gitattributes` rules intact
+- The six large files in `third_party\src\` are **git-lfs** objects — keep the
+  `.gitattributes` rules intact
 
 ## Security
 
