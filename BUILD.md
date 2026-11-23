@@ -721,6 +721,14 @@ toolset names are different series: the toolset lives in
   references OpenSSL, and building it would cost ~20 minutes for archives
   nobody links. `build\steps\02-thirdparty.ps1` skips it and says so;
   `-BuildSslWin32` forces it.
+* **The OpenSSL build depends on whether NASM is installed.** `no-asm` is added
+  to the `Configure` line only when `nasm.exe` is not on `PATH`, so the
+  generated `configuration.h` differs (`OPENSSL_NO_ASM`). Those headers are
+  staged into `third_party\openssl\Win32\include` and are what pjproject is
+  compiled against — the pjproject archive and with it the executable are
+  therefore **not bit-reproducible across machines**. Both variants work (the
+  TLS self test passes with either); only the size differs: about 0.45 MB in
+  the pjproject archive and 0.75 MB in the executable.
 * **OpenSSL's 32-bit target is `VC-WIN32`, not `VC-WIN32A`.** `Configure`
   rejects the latter and prints its whole target table, which is easy to
   mistake for a broken compiler:
