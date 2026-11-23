@@ -24,9 +24,9 @@ cd microsip
 
 The first run checks the toolchain, unpacks the vendored sources, builds
 SQLiteCpp / bcg729 / opus / OpenSSL, builds the pjproject static library for
-x64 and Win32 and then the application. It takes about half an hour on a
-current developer machine — most of it OpenSSL and pjproject; every later run
-reuses what is already there.
+x64 and Win32 and then the application. Measured from a fresh clone: **12 min
+53 s** on a current developer machine — every later run reuses what is already
+there.
 
 Output:
 
