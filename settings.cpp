@@ -856,8 +856,13 @@ void AccountSettings::SettingsLoad(CString filename)
     networkChanges = _wtoi(str);
 
     ptr = updatesInterval.GetBuffer(256);
-    GetPrivateProfileString(section, _T("updatesInterval"), NULL, ptr, 256, filename);
+    // No update check unless the user opts in: a missing or empty key means "never"
+    GetPrivateProfileString(section, _T("updatesInterval"), _T("never"), ptr, 256, filename);
     updatesInterval.ReleaseBuffer();
+    // An empty value is the legacy default (weekly), opt out of it as well
+    if (updatesInterval.IsEmpty()) {
+        updatesInterval = _T("never");
+    }
 
     // load ini settings
 
