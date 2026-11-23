@@ -72,9 +72,10 @@ the output.
 - **The toolset must be overridden.** Upstream's property sheet hardcodes
   `v140`, which no longer ships. The pipeline passes
   `/p:BuildToolset=<detected>` (`v143` / `v145`).
-- **`microsip.vcxproj` is CRLF + UTF-8-BOM.** Edit it byte-wise (a script that
+- **`microsip.vcxproj` is CRLF, without a BOM.** Edit it byte-wise (a script that
   reads and writes raw bytes), never with a text editor that rewrites the
-  encoding.
+  encoding. (`mainDlg.h` is CRLF too, but without a BOM as well; only the
+  `*.cpp` application sources carry one — see the next rule.)
 - **`mainDlg.h` carries a local patch; upstream does not.** Upstream binds the
   pjproject static library by name and hardcodes the **32-bit** artefact. The
   repository makes that selection architecture aware (`_M_X64` →
