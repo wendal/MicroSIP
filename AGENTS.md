@@ -103,7 +103,8 @@ There is no unit-test framework. Verification is script based:
 .\tools\verify-app.ps1 -Exe .\x64\Release\microsip.exe        # starts the app, checks window/threads/db
 .\tools\verify-openssl.ps1 -Configuration Debug                # static OpenSSL self test
 .\tools\verify-tls.ps1 -Configuration Debug                     # real SIP-over-TLS transport
-.\tools\verify-pjproject-provenance.ps1                        # headers vs upstream (needs an upstream checkout)
+.\tools\verify-pjproject-provenance.ps1 `
+    -UpstreamRoot .\build\work\pjproject-2.17 -HeaderTree .\third_party
 ```
 
 After touching the pipeline or the project file, rebuild **and** run
