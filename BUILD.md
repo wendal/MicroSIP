@@ -899,9 +899,9 @@ third_party  =  pjlib/include
 e.g. `pjsip/include/pjsua-lib/pjsua.h` → `third_party\pjsua-lib\pjsua.h`, and
 `pjlib/include/pjlib.h` → `third_party\pjlib.h`.
 
-This rule was verified against the 2.14.1 tree (311 files, 0 differences in
-either direction) before it was applied to 2.17, and it is now a **checked
-invariant**: `tools\verify-pjproject-provenance.ps1` §1c rebuilds the
+This rule was verified against the 2.14.1 tree (310 flattened files, 0
+differences in either direction) before it was applied to 2.17, and it is now a
+**checked invariant**: `tools\verify-pjproject-provenance.ps1` §1c rebuilds the
 flattened tree from the upstream include directories and compares file by
 file. `build\import-deps.ps1` derives the vendored tree the same way, so the
 headers can be re-created from the archive at any time.
