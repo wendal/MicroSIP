@@ -154,6 +154,11 @@ foreach ($f in Get-ChildItem $src -File | Sort-Object Name) {
 $lines += ''
 $lines += '# prebuilt libraries'
 foreach ($f in Get-ChildItem $lib -File | Sort-Object Name) {
+    # The x64 pjproject archives are *built* by build\steps\03-pjproject.ps1 and
+    # are git-ignored, so they must not go into the manifest: a fresh clone does
+    # not have them and the verification would fail. Only the vendored 32-bit
+    # archive belongs here.
+    if ($f.Name -like 'libpjproject-x86_64-*') { continue }
     $hash = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower()
     $lines += ("{0}  lib/{1}" -f $hash, $f.Name)
 }

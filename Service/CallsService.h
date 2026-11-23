@@ -21,15 +21,15 @@
 #include <memory>
 #include <vector>
 #include "../domain/Call.h"
-#include "../data/ICallsRepository.h"
+#include "../Data/CallsRepository.h"
 
 class CallsService
 {
 public:
-    explicit CallsService(std::unique_ptr<ICallsRepository> repository);
+    explicit CallsService(std::unique_ptr<CallsRepository> repository);
 
     int AddCall(Call& log);
-    void UpdateCall(const Call& log);
+    bool UpdateCall(const Call& log);
     void DeleteCall(int id);
     void DeleteCalls(std::vector<int> ids);
     void DeleteAllCalls();
@@ -45,7 +45,7 @@ public:
     std::string ImportCallsCSV(CString filename);
 
 private:
-    std::unique_ptr<ICallsRepository> m_repository;
+    std::unique_ptr<CallsRepository> m_repository;
 
     bool Validate(const Call& call, std::string* error = nullptr);
     

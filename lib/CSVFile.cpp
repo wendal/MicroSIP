@@ -7,6 +7,12 @@ CCSVFile::CCSVFile():
 {
 }
 
+CCSVFile::~CCSVFile()
+{
+    if (this->m_hFile != hFileNull)
+        Close();
+}
+
 bool CCSVFile::ReadData(CStringArray &arr)
 {
 	ULONGLONG pos = GetPosition();

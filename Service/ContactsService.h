@@ -21,12 +21,12 @@
 #include <memory>
 #include <vector>
 #include "../domain/Contact.h"
-#include "../data/IContactsRepository.h"
+#include "../data/ContactsRepository.h"
 
 class ContactsService
 {
 public:
-    explicit ContactsService(std::unique_ptr<IContactsRepository> repository);
+    explicit ContactsService(std::unique_ptr<ContactsRepository> repository);
 
     bool IsContactFiletered(const Contact& contact, CString search);
     bool ContactPrepare(Contact& contact);
@@ -37,7 +37,7 @@ public:
     CString ImportContactsCSV(CString filename, CArray<ContactWithFields*>& contactsWithFields, bool directory = false);
 
 private:
-    std::unique_ptr<IContactsRepository> m_repository;
+    std::unique_ptr<ContactsRepository> m_repository;
 
     bool Validate(const Contact& contact, CString* error = nullptr);
     

@@ -86,6 +86,8 @@ public:
 	CButtonEx m_ButtonCall;
 	//CMFCButton m_ButtonCall;
 	CButtonEx m_ButtonEnd;
+    CButton m_ButtonHold;
+    CButton m_ButtonTransfer;
 
 	bool m_isButtonVoicemailVisible;
 	bool m_hasVoicemail;

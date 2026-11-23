@@ -17,27 +17,33 @@
  */
 
 #pragma once
-#include "ICallsRepository.h"
 #include <SQLiteCpp/SQLiteCpp.h>
+#include "../domain/Call.h"
+#include <vector>
 
-class CallsRepository : public ICallsRepository
+class CallsRepository
 {
 public:
     explicit CallsRepository(SQLite::Database& db);
-    
-    void BeginTransaction();
-    void Commit();
-    void Rollback();    
 
-    int Add(const Call& call) override;
-    void Update(const Call& call) override;
-    void Delete(int id) override;
+    template <typename Func>
+    void ExecuteTransaction(Func&& func)
+    {
+        SQLite::Transaction transaction(m_db);
+        if (!std::forward<Func>(func)())
+            return;
+        transaction.commit();
+    }
+
+    int Add(const Call& call);
+    void Update(const Call& call);
+    void Delete(int id);
     void DeleteByIds(std::vector<int> ids);
-    void DeleteAll() override;
+    void DeleteAll();
 
-    std::unique_ptr<Call> GetById(int id) override;
+    std::unique_ptr<Call> GetById(int id);
     std::unique_ptr<Call> GetByCallId(const CString& callId);
-    std::vector<std::unique_ptr<Call>> GetAll(int limit = 0) override;
+    std::vector<std::unique_ptr<Call>> GetAll(int limit = 0);
 
 private:
     SQLite::Database& m_db;

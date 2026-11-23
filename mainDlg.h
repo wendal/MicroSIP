@@ -122,6 +122,7 @@ public:
     CList<CString> audioCodecList;
     CList<int> confernceCalls;
 
+    void ApplyTheme() override;
     void InitUI();
     void ShowTrayIcon();
     void PJCreate();
@@ -138,6 +139,8 @@ public:
 #endif
 
     bool CommandLine(CString params);
+    void PostRunCmd(const CString& cmdLine, const CString& addParams, bool noWait = false);
+    LRESULT CmainDlg::OnRunCmd(WPARAM, LPARAM lParam);
     void TabFocusSet() override;
     void UpdateWindowText(CString = CString(), int icon = IDI_DEFAULT, bool afterRegister = false);
     void PublishStatus(bool online = true, bool init = false);
@@ -187,6 +190,8 @@ public:
 #ifdef _GLOBAL_VIDEO
     Preview* previewWin = nullptr;
     int VideoCaptureDeviceId(CString name = _T(""));
+    void CreatePreviewWin();
+    bool CameraPermissions();
 #endif
     void MessagesIncoming(CString* number, CString* message, CTime* pTime = NULL);
 
@@ -233,10 +238,10 @@ protected:
 
     // Generated message map functions
     afx_msg LRESULT OnCreated(WPARAM wParam, LPARAM lParam);
-    afx_msg LRESULT OnUpdateWindowText(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT onTrayNotify(WPARAM, LPARAM);
     afx_msg LRESULT onCreateRingingDlg(WPARAM, LPARAM);
     afx_msg LRESULT onRefreshLevels(WPARAM wParam, LPARAM lParam);
+    afx_msg LRESULT onRegStarted(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT onRegState2(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT onCallState(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT onIncomingCall(WPARAM wParam, LPARAM lParam);
@@ -303,9 +308,6 @@ public:
     afx_msg void OnCheckUpdates();
     afx_msg void CheckUpdates();
     afx_msg LRESULT OnUpdateCheckerLoaded(WPARAM wParam, LPARAM lParam);
-#ifdef _GLOBAL_VIDEO
-    afx_msg void createPreviewWin();
-#endif
     afx_msg	void OnUpdatePane(CCmdUI* pCmdUI);
 };
 

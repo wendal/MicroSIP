@@ -1066,6 +1066,11 @@ void AccountSettings::SettingsLoad(CString filename)
     alwaysOnTop = _wtoi(str);
 
     ptr = str.GetBuffer(256);
+    GetPrivateProfileString(section, _T("skipMakeActivePrompt"), NULL, ptr, 256, filename);
+    str.ReleaseBuffer();
+    skipMakeActivePrompt = _wtoi(str);
+
+    ptr = str.GetBuffer(256);
     GetPrivateProfileString(section, _T("enableShortcuts"), NULL, ptr, 256, filename);
     str.ReleaseBuffer();
     enableShortcuts = _wtoi(str);
@@ -1101,7 +1106,7 @@ void AccountSettings::SettingsSave(CString filename)
     WritePrivateProfileString(section, _T("accountId"), str, filename);
 
     // save user settings
-
+    
     WritePrivateProfileString(section, _T("singleMode"), singleMode ? _T("1") : _T("0"), filename);
     WritePrivateProfileString(section, _T("ringingSound"), ringtone, filename);
     str.Format(_T("%d"), volumeRing);
@@ -1276,6 +1281,8 @@ void AccountSettings::SettingsSave(CString filename)
     WritePrivateProfileString(section, _T("DND"), DND ? _T("1") : _T("0"), filename);
     str.Format(_T("%d"), alwaysOnTop);
     WritePrivateProfileString(section, _T("alwaysOnTop"), str, filename);
+    str.Format(_T("%d"), skipMakeActivePrompt);
+    WritePrivateProfileString(section, _T("skipMakeActivePrompt"), str, filename);
 
     WritePrivateProfileString(section, _T("enableShortcuts"), enableShortcuts ? _T("1") : _T("0"), filename);
     WritePrivateProfileString(section, _T("shortcutsBottom"), shortcutsBottom ? _T("1") : _T("0"), filename);

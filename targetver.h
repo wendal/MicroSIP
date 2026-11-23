@@ -9,6 +9,7 @@
 
 // Modify the following defines if you have to target a platform prior to the ones specified below.
 // Refer to MSDN for the latest info on corresponding values for different platforms.
+
 #ifndef WINVER
 #define WINVER 0x0601           // Change this to the appropriate value to target other versions of Windows.
 #endif

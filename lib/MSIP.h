@@ -26,6 +26,13 @@ struct SIPURI {
 	CString user;
 	CString domain;
 	CString suffix;
+    void operator=(const SIPURI& a)
+    {
+        name = a.name;
+        user = a.user;
+        domain = a.domain;
+        suffix = a.suffix;
+    };
 };
 
 CStringA msip_md5sum(const CStringA& str);
@@ -63,9 +70,9 @@ bool IniSectionExists(const CString& section, const CString& iniFile);
 CString Bin2String(CByteArray *ca);
 void String2Bin(const CString& str, CByteArray *res);
 void CommandLineToShell(CString cmd, CString &command, CString &params);
-void RunCmd(const CString& cmdLine, const CString& addParams=_T(""), bool noWait = false);
 bool IsNat64(const sockaddr_in6* addr);
 void PortKnock();
+void RunCmdCOM(const CString& cmdLine, const CString& addParams=_T(""), bool noWait = false);
 bool IsConnectedToNetworkCOM(bool bCheckInternet = false);
 bool IsNetworkChanged();
 CString FormatDateTime(CTime* pTime, CTime* pTimeNow = NULL);

@@ -75,6 +75,8 @@ void Dialer::DoDataExchange(CDataExchange* pDX)
     DDX_Control(pDX, IDC_CLEAR, m_ButtonDialerClear);
     DDX_Control(pDX, IDC_CALL, m_ButtonCall);
     DDX_Control(pDX, IDC_END, m_ButtonEnd);
+    DDX_Control(pDX, IDC_HOLD, m_ButtonHold);
+    DDX_Control(pDX, IDC_TRANSFER, m_ButtonTransfer);
 }
 
 void Dialer::RebuildButtons(bool init)
@@ -267,9 +269,9 @@ void Dialer::RebuildShortcuts(bool init)
         while (pos) {
             POSITION posKey = pos;
             CButton* button = shortcutButtons.GetNext(pos);
+            shortcutButtons.RemoveAt(posKey);
             AutoUnmove(button->m_hWnd);
             delete button;
-            shortcutButtons.RemoveAt(posKey);
         };
     }
     if (!mainDlg->shortcutsEnabled) {
@@ -1164,9 +1166,9 @@ void Dialer::SetNumber(CString number, int callsCount)
     CString old;
     combobox->GetWindowText(old);
     if (old.IsEmpty() || number.Find(old) != 0) {
-        if (!number.IsEmpty()) {
-            number.AppendChar(' '); // prevent combobox autocomplete
-        }
+        //if (!number.IsEmpty()) {
+        //    number.AppendChar(' '); // prevent combobox autocomplete
+        //}
         combobox->SetWindowText(number);
     }
     UpdateCallButton(0, callsCount);

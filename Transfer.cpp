@@ -73,7 +73,13 @@ BOOL Transfer::OnInitDialog()
 
 void Transfer::SetDropDownWidth(CComboBox& combo)
 {
+    if (!::IsWindow(combo.GetSafeHwnd())) {
+        return;
+    }
     CDC* pDC = combo.GetDC();
+    if (!pDC) {
+        return;
+    }
     CFont* pOldFont = pDC->SelectObject(combo.GetFont());
 
     int maxWidth = 0;

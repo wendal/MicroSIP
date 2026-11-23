@@ -1,6 +1,6 @@
-# Building MicroSIP 3.22.16 from source
+# Building MicroSIP 3.23.5 from source
 
-The official release archive (`MicroSIP-3.22.16-src.7z`, downloadable from
+The official release archive (`MicroSIP-3.23.5-src.7z`, downloadable from
 <https://www.microsip.org/source>) contains **only the application sources**.
 `microsip.vcxproj` expects to sit next to a full dependency tree:
 
@@ -9,7 +9,7 @@ The official release archive (`MicroSIP-3.22.16-src.7z`, downloadable from
 ├─ build/vs/pjproject-vs14-common-config.props   (imported by microsip.vcxproj)
 ├─ third_party/…                                 (pjsip headers, SQLiteCpp, libs)
 ├─ lib/                                          (prebuilt static libs)
-└─ MicroSIP-3.22.16-src/                         (this repository)
+└─ MicroSIP-3.23.5-src/                         (this repository)
 ```
 
 Upstream ships none of it — the project page states:
@@ -26,7 +26,7 @@ This document records how the tree was reconstructed and how to rebuild it.
 Everything the build needs is **inside** the repository:
 
 ```
-MicroSIP-3.22.16-src\
+MicroSIP-3.23.5-src\
 ├─ build\               the build pipeline (details in build\README.md)
 │  ├─ build.ps1         single entry point
 │  ├─ steps\            00-check-toolchain … 04-app
@@ -222,7 +222,7 @@ static one.
    microsip.vcxproj /t:Build /p:Configuration=Debug /p:Platform=Win32 /m /v:m /nologo
 ```
 
-Output: `Debug\microsip.exe` (x86, 15.8 MB, file version 3.22.16).
+Output: `Debug\microsip.exe` (x86, 15.8 MB, file version 3.23.5).
 
 **Out of the box only `Debug|Win32` links**, because the prebuilt pjsip library
 exists solely as `libpjproject-i386-Win32-vc14-Debug-Static.lib`:
@@ -601,7 +601,7 @@ while building.
 
 ```powershell
 git clone <this repository>
-cd MicroSIP-3.22.16-src
+cd MicroSIP-3.23.5-src
 .\build\build.ps1
 ```
 
@@ -713,5 +713,123 @@ toolset names are different series: the toolset lives in
   32-bit pjproject library is vendored, so the Release link would look for
   `libpjproject-i386-Win32-vc14-Release-Static.lib` and fail. Step 4 detects
   the missing archive and skips that configuration with an explanation.
+
+---
+
+## 13. Updating the application sources to 3.23.5
+
+The application sources were replaced with the official
+`MicroSIP-3.23.5-src.7z` release. 36 source files changed, 2 were added
+(`packages.config`, `microsip-webview.vcxproj.filters` — both upstream
+artefacts of the WebView2 feature that the release archive ships without the
+matching project), and 2 were deleted: upstream 3.23.5 drops the
+`Data\ICallsRepository.h` / `Data\IContactsRepository.h` interfaces and lets
+`CallsRepository` / `ContactsRepository` be used directly.
+
+Three things had to be handled on top of copying the files.
+
+### 13.1 `microsip.vcxproj` is *not* upstream's
+
+The repository's project file is upstream's with the include and library paths
+rewritten for the flattened `third_party\` layout (§12.3). It is therefore
+**not** replaced by the release archive's copy. The only change taken from
+upstream's file is the removal of the two `<ClInclude>` entries for the
+interfaces that 3.23.5 deletes. The file is edited byte-wise — it is CRLF and
+has no BOM.
+
+`microsip.vcxproj.filters` has no such adaptation, so it *is* replaced with
+upstream's copy.
+
+### 13.2 The pjproject constant rename
+
+Upstream MicroSIP 3.23.x ships **pjproject 2.17** (the 3.23.4 changelog says
+"updated PJSIP to version 2.17"). This repository keeps **2.14.1**, because the
+only prebuilt 32-bit library that ships with MicroSIP is a 2.14.1 build and
+rebuilding pjproject for Win32 is out of scope (§6, §9).
+
+The single API difference the 3.23.5 sources depend on is the name of a
+compile-time constant. pjproject 2.15 renamed
+
+```
+PJMEDIA_AUD_MAX_DEVS      ->      PJMEDIA_AUD_DEV_MAX_DEVS
+```
+
+Both default to 64. `mainDlg.cpp`, `SettingsDlg.cpp` and `microsip.cpp` size
+their `pjmedia_aud_dev_info` arrays with the new name, so the 2.14.1 headers
+do not compile them:
+
+```
+mainDlg.cpp(3808,22): error C2065: "PJMEDIA_AUD_DEV_MAX_DEVS": 未声明的标识符
+```
+
+`build\steps\01-prepare.ps1` therefore adds to the generated `pj\config_site.h`:
+
+```c
+#ifndef PJMEDIA_AUD_DEV_MAX_DEVS
+#  ifdef PJMEDIA_AUD_MAX_DEVS
+#    define PJMEDIA_AUD_DEV_MAX_DEVS PJMEDIA_AUD_MAX_DEVS
+#  else
+#    define PJMEDIA_AUD_DEV_MAX_DEVS 64
+#  endif
+#endif
+```
+
+`config_site.h` is pjproject's own configuration hook and is included by
+`pj\config.h` before anything else, so the macro is visible everywhere the
+application uses it. The `#ifndef` guard makes the block a no-op once the
+headers define the new name themselves, so the file stays correct if the
+vendored pjproject is ever upgraded. pjproject 2.14.1 never uses the new name
+itself, so the compiled library is unaffected.
+
+### 13.3 `mainDlg.h` carries a local patch
+
+Upstream binds the pjproject static library by name and hardcodes the **32-bit**
+artefact:
+
+```c
+#ifdef NDEBUG
+#pragma comment(lib, "libpjproject-i386-Win32-vc14-Release-Static.lib")
+#else
+#pragma comment(lib, "libpjproject-i386-Win32-vc14-Debug-Static.lib")
+#endif
+```
+
+The repository replaces that with the architecture-aware block of §11.3 plus
+`#pragma comment(lib, "opus.lib")`. Without it the x64 link picks up the
+32-bit archive from `third_party\lib\`, and the linker reports
+
+```
+warning LNK4272: 库计算机类型"x86"与目标计算机类型"x64"冲突
+fatal error LNK1120: 145 个无法解析的外部命令
+```
+
+The unresolved symbols (`pjsua_*`, `acquire_call`, …) all exist in pjproject
+2.14.1 — the 32-bit archive was simply skipped because of the architecture
+mismatch. The block has to be re-applied after every upstream update.
+
+### 13.4 The UTF-8 BOM
+
+Upstream 3.23.5 ships `mainDlg.cpp` **without** a UTF-8 BOM; the 3.22.16
+release had one. The machine's ANSI code page is 936 (GBK), so MSVC reads a
+BOM-less file as ACP and mis-decodes the `·` (U+00B7) and `–` (U+2013)
+literals in the file:
+
+```
+mainDlg.cpp(2272,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符
+```
+
+The BOM is therefore put back. The result is that `mainDlg.cpp` is the only
+file in the tree that is not byte-identical to the 3.23.5 release archive.
+
+### 13.5 Result
+
+| Configuration | Binary | File version |
+|---|---|---|
+| `x64\|Debug` | `x64\Debug\microsip.exe` (26,264,576 bytes) | 3.23.5 |
+| `x64\|Release` | `x64\Release\microsip.exe` (10,138,112 bytes) | 3.23.5 |
+
+Verified with `tools\verify-app.ps1` (window, threads, `call_log.db`) and
+`tools\verify-tls.ps1` (a real SIP-over-TLS transport) for both
+configurations.
 
 

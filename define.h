@@ -68,7 +68,7 @@
 #define _GLOBAL_MENU_ISSUES "https://www.microsip.org/issues"
 #define _GLOBAL_MENU_HELP "https://www.microsip.org/help"
 #define _GLOBAL_HELP_WEBSITE "https://www.microsip.org/help"
-#define _GLOBAL_URL_CHECK_VERSION "https://www.microsip.org/check-version?ver="
+#define _GLOBAL_URL_CHECK_VERSION "https://www.microsip.org/check-version"
 #define _GLOBAL_TECH_DETAILS
 
 #define _GLOBAL_EC_DEFAULT "1"

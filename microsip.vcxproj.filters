@@ -374,9 +374,6 @@
     <ClInclude Include="data\CallsRepository.h">
       <Filter>Header Files\Data</Filter>
     </ClInclude>
-    <ClInclude Include="data\ICallsRepository.h">
-      <Filter>Header Files\Data</Filter>
-    </ClInclude>
     <ClInclude Include="service\CallsService.h">
       <Filter>Header Files\Service</Filter>
     </ClInclude>
@@ -391,9 +388,6 @@
     </ClInclude>
     <ClInclude Include="Domain\Shortcut.h">
       <Filter>Header Files\Domain</Filter>
-    </ClInclude>
-    <ClInclude Include="Data\IContactsRepository.h">
-      <Filter>Header Files\Data</Filter>
     </ClInclude>
     <ClInclude Include="Service\ContactsService.h">
       <Filter>Header Files\Service</Filter>

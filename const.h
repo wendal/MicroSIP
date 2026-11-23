@@ -18,9 +18,9 @@
  */
 
 #pragma once
-#define _GLOBAL_VERSION "3.22.16"
-#define _GLOBAL_VERSION_COMMA 3,22,16,0
-#define _GLOBAL_TIMESTAMP 1789417397
+#define _GLOBAL_VERSION "3.23.5"
+#define _GLOBAL_VERSION_COMMA 3,23,5,0
+#define _GLOBAL_TIMESTAMP 1794843687
 #define _GLOBAL_KEY "*********"
 #define _GLOBAL_VIDEO
 #define _GLOBAL_NAME "MicroSIP"

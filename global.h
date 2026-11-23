@@ -29,8 +29,8 @@ enum EUserWndMessages
     UM_FIRST_USER_MSG = (WM_USER + 0x100 + 1),
     
     UM_CREATED,
+    UM_RUN_CMD,    
 
-    UM_UPDATEWINDOWTEXT,
     UM_NOTIFYICON,
 
     UM_UPDATE_SETTINGS,
@@ -40,6 +40,7 @@ enum EUserWndMessages
     UM_CALL_HANGUP,
     UM_TAB_ICON_UPDATE,
     UM_ON_ACCOUNT,
+    UM_ON_REG_STARTED,
     UM_ON_REG_STATE2,
     UM_ON_CALL_STATE,
     UM_ON_INCOMING_CALL,
@@ -130,6 +131,13 @@ enum {
     MSIP_CONTACT_ICON_ON_THE_PHONE_STARRED,
     MSIP_CONTACT_ICON_BUSY_STARRED,
     MSIP_CONTACT_ICON_DEFAULT_STARRED
+};
+
+struct RunCmdData
+{
+    CString cmdLine;
+    CString addParams;
+    bool noWait;
 };
 
 struct Account {
@@ -272,6 +280,7 @@ struct call_tonegen_data
     pjsua_conf_port_id  toneslot;
     pjsua_conf_port_id  rec_conf_port_id = PJSUA_INVALID_ID;
     bool remote_connected = false;
+    bool local_connected = false;
 };
 
 struct call_user_data
@@ -344,8 +353,9 @@ CString SanitizeNumber(const CString& number);
 CString FormatNumber(CString& number, CString* commands = NULL, bool noTransform = false);
 void AddTransportSuffix(CString& address, Account* account);
 CString GetSIPURI(CString str, bool isSimple = false, bool isLocal = false, CString domain = _T(""));
-void ParseCallSIPURI(CString& number, call_user_data* user_data, SIPURI& uri);
-void ParseCallSIPURI(pjsua_call_info* call_info, call_user_data* user_data, SIPURI& uri);
+void ParseCallSIPURI(pjsua_call_info* call_info, call_user_data* user_data, SIPURI& uri, SIPURI* uriAlt = nullptr);
+void ParseCallSIPURI(CString& number, call_user_data* user_data, SIPURI& uri, bool incoming, SIPURI* uriAlt = nullptr);
+
 CString GetPAI(pjsip_rx_data* rdata);
 bool SelectSIPAccount(CString number, pjsua_acc_id& acc_id, pj_str_t* pj_uri = NULL);
 CString get_account_display_name(Account* account);
@@ -356,7 +366,7 @@ CString get_account_server();
 void get_account_proxy(Account* account, CStringList& proxies);
 CString get_public_addr(Account* account = NULL);
 void msip_tonegen_init(call_tonegen_data*& cd, pjsua_call_id call_id, bool inband);
-BOOL msip_call_play_digit(pjsua_call_id call_id, const char* digits, bool inband = false);
+BOOL msip_call_play_digit(pjsua_call_id call_id, const char* digits, bool inband = false, bool incoming = false);
 void msip_call_deinit_tonegen(pjsua_call_id call_id, call_user_data* user_data);
 void destroyDTMFPlayerTimerHandler(
     HWND hwnd,

@@ -42,8 +42,6 @@ BOOL CThemeDialog::OnInitDialog()
 {
     CDialog::OnInitDialog();
 
-    lastDark = -1;
-
     ApplyTheme();
 
     return TRUE;  // return TRUE  unless you set the focus to a control
@@ -57,7 +55,7 @@ HBRUSH CThemeDialog::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
         //GRAY_BRUSH	RGB(128, 128, 128)
         //DKGRAY_BRUSH	RGB(64, 64, 64)
         //BLACK_BRUSH	RGB(0, 0, 0)
-        if (lastDark == 1) {
+        if (m_nLastDark == 1) {
             switch (nCtlColor)
             {
             case CTLCOLOR_EDIT:
@@ -115,8 +113,8 @@ void CThemeDialog::ApplyTheme()
         &size
     );
     BOOL currentDark = (value == 0);
-    if (lastDark == -1 || currentDark != lastDark) {
-        lastDark = currentDark;
+    if (m_nLastDark == -1 || currentDark != m_nLastDark) {
+        m_nLastDark = currentDark;
         DwmSetWindowAttribute(
             m_hWnd,
             DWMWA_USE_IMMERSIVE_DARK_MODE,
@@ -148,7 +146,7 @@ void CThemeDialog::ApplyTheme()
                         }
                     }
                 }
-            }
+            } else 
             if (allowDark) {
                 if (wcscmp(cls, L"ComboBox") == 0) {
                     SetWindowTheme(hWnd, dark ? L"DarkMode_CFD" : L"CFD", nullptr);

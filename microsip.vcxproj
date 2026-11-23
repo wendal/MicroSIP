@@ -448,8 +448,6 @@
     <ClInclude Include="Data\CallsRepository.h" />
     <ClInclude Include="Data\ContactsRepository.h" />
     <ClInclude Include="Data\Database.h" />
-    <ClInclude Include="Data\ICallsRepository.h" />
-    <ClInclude Include="Data\IContactsRepository.h" />
     <ClInclude Include="define.h" />
     <ClInclude Include="Dialer.h" />
     <ClInclude Include="Domain\Call.h" />

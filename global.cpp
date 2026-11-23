@@ -63,7 +63,7 @@ bool is_pjsua_running() {
     return g_bRunning && pjsua_get_state() == PJSUA_STATE_RUNNING;
 }
 
-CString SanitizeNumber(const CString &number) {
+CString SanitizeNumber(const CString& number) {
     CString res = number;
     res.Remove('.');
     res.Remove('-');
@@ -252,15 +252,29 @@ CString GetSIPURI(CString str, bool isSimple, bool isLocal, CString domain)
     {
         str = _T("sip:") + str;
     }
-    pos = str.Find(_T("@"));
-    if (!isLocal) {
-        if (accountSettings.accountId && pos == -1) {
-            str.Append(_T("@") + (!domain.IsEmpty() ? domain : get_account_domain()));
+    pos = str.Find('@');
+    if (pos == -1) {
+        if (domain.IsEmpty()) {
+            if (!isLocal) {
+                if (accountSettings.accountId) {
+                    domain = get_account_domain();
+                }
+            }
+            else {
+                domain = accountSettings.accountLocal.domain;
+            }
         }
-    }
-    else {
-        if (pos == -1 && !accountSettings.accountLocal.domain.IsEmpty()) {
-            str.Append(_T("@") + accountSettings.accountLocal.domain);
+        if (!domain.IsEmpty()) {
+            int pos = str.Find(';');
+            if (pos == -1) {
+                pos = str.Find('?');
+            }
+            if (pos == -1) {
+                str.Append(L"@" + domain);
+            }
+            else {
+                str.Insert(pos, L"@" + domain);
+            }
         }
     }
     if (str.GetAt(str.GetLength() - 1) == '>')
@@ -280,7 +294,7 @@ CString GetSIPURI(CString str, bool isSimple, bool isLocal, CString domain)
     return str;
 }
 
-void ParseCallSIPURI(CString& number, call_user_data* user_data, SIPURI& uri)
+void ParseCallSIPURI(CString& number, call_user_data* user_data, SIPURI& uri, bool incoming, SIPURI* uriAlt)
 {
     SIPURI sipuriCallerID;
     if (user_data) {
@@ -292,19 +306,29 @@ void ParseCallSIPURI(CString& number, call_user_data* user_data, SIPURI& uri)
     }
     MSIP::ParseSIPURI(number, uri);
     if (!sipuriCallerID.user.IsEmpty()) {
-        uri.user = sipuriCallerID.user;
-    }
-    if (!sipuriCallerID.domain.IsEmpty()) {
-        uri.domain = sipuriCallerID.domain;
-    }
-    if (!sipuriCallerID.name.IsEmpty()) {
-        uri.name = sipuriCallerID.name;
+        if (incoming) {
+            if (uriAlt) {
+                *uriAlt = uri;
+            }
+            uri.user = sipuriCallerID.user;
+            if (!sipuriCallerID.domain.IsEmpty()) {
+                uri.domain = sipuriCallerID.domain;
+            }
+            if (!sipuriCallerID.name.IsEmpty()) {
+                uri.name = sipuriCallerID.name;
+            }
+        }
+        else {
+            if (uriAlt) {
+                *uriAlt = sipuriCallerID;
+            }
+        }
     }
 }
 
-void ParseCallSIPURI(pjsua_call_info* call_info, call_user_data* user_data, SIPURI& uri)
+void ParseCallSIPURI(pjsua_call_info* call_info, call_user_data* user_data, SIPURI& uri, SIPURI* uriAlt)
 {
-    ParseCallSIPURI(MSIP::PjToStr(&call_info->remote_info, TRUE), user_data, uri);
+    ParseCallSIPURI(MSIP::PjToStr(&call_info->remote_info, TRUE), user_data, uri, call_info->role == PJSIP_ROLE_UAS, uriAlt);
 }
 
 CString GetPAI(pjsip_rx_data* rdata)
@@ -419,6 +443,12 @@ void msip_tonegen_init(call_tonegen_data*& cd, pjsua_call_id call_id, bool inban
         }
         user_data->CS.Unlock();
         if (inband) {
+            if (!accountSettings.localDTMF) {
+                if (cd->local_connected) {
+                    pjsua_conf_disconnect(cd->toneslot, 0);
+                    cd->local_connected = false;
+                }
+            }
             if (!cd->remote_connected) {
                 pjsua_conf_connect(cd->toneslot, ci.conf_slot); // play to remote
                 cd->remote_connected = true;
@@ -429,16 +459,17 @@ void msip_tonegen_init(call_tonegen_data*& cd, pjsua_call_id call_id, bool inban
                 pjsua_conf_disconnect(cd->toneslot, ci.conf_slot);
                 cd->remote_connected = false;
             }
-        }
-        if (first) {
-            pjsua_conf_connect(cd->toneslot, 0); // local play
+            if (!accountSettings.localDTMF) {
+                if (!cd->local_connected) {
+                    pjsua_conf_connect(cd->toneslot, 0); // local play from remote (dynamic)
+                    cd->local_connected = true;
+                }
+            }
         }
     }
-    else {
-        if (accountSettings.localDTMF) {
-            if (first) {
-                pjsua_conf_connect(cd->toneslot, 0); // local play
-            }
+    if (accountSettings.localDTMF) {
+        if (first) {
+            pjsua_conf_connect(cd->toneslot, 0); // local play from local and remote (static)
         }
     }
 }
@@ -620,8 +651,9 @@ void msip_call_dial_dtmf(pjsua_call_id call_id, CString digits, bool silent)
     if (!is_pjsua_running()) {
         return;
     }
+    bool playback = accountSettings.localDTMF && !silent;
     if (call_id == PJSUA_INVALID_ID) {
-        if (accountSettings.localDTMF) {
+        if (playback) {
             msip_set_sound_device(msip_audio_output, false, true);
             msip_call_play_digit(call_id, CStringA(digits));
         }
@@ -650,13 +682,13 @@ void msip_call_dial_dtmf(pjsua_call_id call_id, CString digits, bool silent)
             }
         }
         free(pj_digits.ptr);
-        if (!silent || inband) {
+        if (playback || inband) {
             msip_call_play_digit(call_id, CStringA(digits), inband);
         }
     }
 }
 
-BOOL msip_call_play_digit(pjsua_call_id call_id, const char* digits, bool inband)
+BOOL msip_call_play_digit(pjsua_call_id call_id, const char* digits, bool inband, bool incoming)
 {
     if (!is_pjsua_running()) {
         return FALSE;
@@ -706,7 +738,12 @@ BOOL msip_call_play_digit(pjsua_call_id call_id, const char* digits, bool inband
                 d[i].volume = 0;
             }
             else {
-                d[i].volume = 1 + 25 * PJMEDIA_TONEGEN_VOLUME / 100;
+                if (incoming) {
+                    d[i].volume = 1 + accountSettings.volumeOutput * PJMEDIA_TONEGEN_VOLUME / 100;
+                }
+                else {
+                    d[i].volume = 1 + 25 * PJMEDIA_TONEGEN_VOLUME / 100;
+                }
             }
         }
     }
@@ -720,7 +757,7 @@ BOOL msip_call_play_digit(pjsua_call_id call_id, const char* digits, bool inband
         if (tonegenBusyTimer) {
             KillTimer(NULL, tonegenBusyTimer);
         }
-        tonegenBusyTimer = SetTimer(NULL, NULL, 800, (TIMERPROC)tonegenBusyHandler);
+        tonegenBusyTimer = SetTimer(NULL, NULL, 250, (TIMERPROC)tonegenBusyHandler);
 
     }
 
@@ -1301,7 +1338,7 @@ void msip_call_send_dtmf_info(pjsua_call_id current_call, pj_str_t digits)
             status = pjsua_call_send_request(current_call, &SIP_INFO,
                 &msg_data);
             pj_pool_safe_release(&pool);
-		
+
             if (status != PJ_SUCCESS) {
                 return;
             }
@@ -1635,7 +1672,7 @@ bool msip_call_answer(pjsua_call_id call_id)
     return false;
 }
 
-void msip_call_busy(pjsua_call_id call_id, const CString &reason)
+void msip_call_busy(pjsua_call_id call_id, const CString& reason)
 {
     if (!is_pjsua_running()) {
         return;

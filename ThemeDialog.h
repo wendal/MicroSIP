@@ -23,6 +23,7 @@ class CThemeDialog : public CDialog
     // Construction
 public:
     CThemeDialog(UINT nIDTemplate, CWnd* pParent = NULL);   // standard constructor
+    virtual void ApplyTheme();
 
     // Overrides
     // ClassWizard generated virtual function overrides
@@ -32,13 +33,12 @@ protected:
 
 protected:
     bool m_bAllowDark = false;
+    BYTE m_nLastDark = -1;
     //{{AFX_MSG(CThemeDialog)
     virtual BOOL OnInitDialog();
     afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
     afx_msg void OnSettingChange(UINT uFlags, LPCTSTR lpszSection);
     //}}AFX_MSG
-    void ApplyTheme();
-    BYTE lastDark;
     DECLARE_MESSAGE_MAP()
 
 private:

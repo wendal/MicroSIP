@@ -47,3 +47,21 @@ inline void trim(std::string& s)
     s.erase(0, s.find_first_not_of(whitespace));
     s.erase(s.find_last_not_of(whitespace) + 1);
 }
+
+inline int FindInsensitive(
+    const CString& text,
+    const CString& search)
+{
+    return FindNLSStringEx(
+        LOCALE_NAME_USER_DEFAULT,
+        LINGUISTIC_IGNORECASE | LINGUISTIC_IGNOREDIACRITIC,
+        text,
+        text.GetLength(),
+        search,
+        search.GetLength(),
+        nullptr,
+        nullptr,
+        nullptr,
+        0
+    );
+}

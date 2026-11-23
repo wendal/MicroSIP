@@ -25,21 +25,6 @@ CallsRepository::CallsRepository(SQLite::Database& db)
 {
 }
 
-void CallsRepository::BeginTransaction()
-{
-    m_db.exec("BEGIN TRANSACTION;");
-}
-
-void CallsRepository::Commit()
-{
-    m_db.exec("COMMIT;");
-}
-
-void CallsRepository::Rollback()
-{
-    m_db.exec("ROLLBACK;");
-}
-
 int CallsRepository::Add(const Call& call)
 {
     SQLite::Statement query(m_db,
@@ -47,10 +32,8 @@ int CallsRepository::Add(const Call& call)
         "(callId, number, name, type, time, duration, info"
         ") VALUES (?, ?, ?, ?, ?, ?, ?"
         ");");
-
     BindCallFields(query, call, false);
     query.exec();
-
     return static_cast<int>(m_db.getLastInsertRowid());
 }
 

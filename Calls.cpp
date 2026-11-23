@@ -93,7 +93,16 @@ BOOL Calls::OnInitDialog()
 
     CString filename = accountSettings.pathRoaming + _T("call_log.db");
     static Database db(CStringToUtf8(filename));
-    db.InitCalls();
+    try {
+        db.InitCalls();
+    }
+    catch (const SQLite::Exception& e)
+    {
+        CString str;
+        str.Format(_T("Failed to initialize call history database %s"), filename);
+        throw std::runtime_error(CW2A(str, CP_UTF8));
+    }
+
     static CallsService callsService(std::make_unique<CallsRepository>(db.Get()));
 
     m_callsService = &callsService;
@@ -443,14 +452,19 @@ void Calls::OnMenuDelete()
         return;
     }
     if (m_list.GetSelectedCount() < 100) {
-        for (int i = m_list.GetItemCount() - 1; i >= 0; --i) {
-            if (m_list.GetItemState(i, LVIS_SELECTED) & LVIS_SELECTED) {
-                Call* pCall = reinterpret_cast<Call*>(m_list.GetItemData(i));
-                m_callsService->DeleteCall(pCall->id);
-                m_list.DeleteItem(i);
-                delete pCall;
-
+        try {
+            for (int i = m_list.GetItemCount() - 1; i >= 0; --i) {
+                if (m_list.GetItemState(i, LVIS_SELECTED) & LVIS_SELECTED) {
+                    Call* pCall = reinterpret_cast<Call*>(m_list.GetItemData(i));
+                    m_callsService->DeleteCall(pCall->id);
+                    m_list.DeleteItem(i);
+                    delete pCall;
+                }
             }
+        }
+        catch (const SQLite::Exception& e)
+        {
+            OnDeleteCallError();
         }
     }
     else {
@@ -461,8 +475,14 @@ void Calls::OnMenuDelete()
                 ids.push_back(pCall->id);
             }
         }
-        m_callsService->DeleteCalls(ids);
-        OnFilterValueChange();
+        try {
+            m_callsService->DeleteCalls(ids);
+            OnFilterValueChange();
+        }
+        catch (const SQLite::Exception& e)
+        {
+            OnDeleteCallsError();
+        }
     }
 }
 
@@ -487,10 +507,16 @@ void Calls::Export(bool bFilter)
     CFileDialog dlgFile(FALSE, _T("csv"), MSIP::MakeFilenameFromString(defaultFilename), OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY, szFilters, this);
     if (dlgFile.DoModal() == IDOK) {
         CString filename = dlgFile.GetPathName();
-        if (dlgFile.GetFileExt().IsEmpty()) {
-            filename.Append(_T(".csv"));
+        try {
+            if (dlgFile.GetFileExt().IsEmpty()) {
+                filename.Append(_T(".csv"));
+            }
+            m_callsService->ExportCallsCSV(filename, search);
         }
-        m_callsService->ExportCallsCSV(filename, search);
+        catch (const SQLite::Exception& e)
+        {
+            OnExportHistoryError();
+        }
     }
 }
 
@@ -498,7 +524,15 @@ void Calls::OnMenuImport()
 {
     CFileDialog dlgFile(TRUE, _T("cvs"), 0, OFN_FILEMUSTEXIST | OFN_HIDEREADONLY, _T("CSV Files (*.csv)|*.csv|"), this);
     if (dlgFile.DoModal() == IDOK) {
-        std::string error = m_callsService->ImportCallsCSV(dlgFile.GetPathName());
+        std::string error;
+        try {
+            error = m_callsService->ImportCallsCSV(dlgFile.GetPathName());
+        }
+        catch (const SQLite::Exception& e)
+        {
+            OnImportHistoryError();
+            return;
+        }
         if (error.empty()) {
             OnFilterValueChange();
         }
@@ -523,6 +557,17 @@ int Calls::FindListItem(int id)
 
 void Calls::Add(pj_str_t id, CString address, CString name, CString commands, int type, call_user_data* user_data)
 {
+    CString callId = MSIP::PjToStr(&id);
+    std::unique_ptr<Call> call = nullptr;
+    try {
+        call = m_callsService->GetCallByCallId(callId);
+    }
+    catch (const SQLite::Exception& e)
+    {
+        OnLoadCallError();
+        return;
+    }
+
     SIPURI sipuri;
     MSIP::ParseSIPURI(address, sipuri);
 
@@ -552,9 +597,6 @@ void Calls::Add(pj_str_t id, CString address, CString name, CString commands, in
     }
     numberLocal.Append(numberLocalSuffix);
 
-    CString callId = MSIP::PjToStr(&id);
-
-    auto call = m_callsService->GetCallByCallId(callId);
     if (!call) {
         ReloadTime();
         call = std::make_unique<Call>();
@@ -562,42 +604,58 @@ void Calls::Add(pj_str_t id, CString address, CString name, CString commands, in
         call->number = numberLocal;
         call->name = name;
         call->type = type;
-        if (m_callsService->AddCall(*call)) {
-            if (!IsFiltered(*call)) {
-                AddListItem(std::move(call));
+        try {
+            if (m_callsService->AddCall(*call)) {
+                if (!IsFiltered(*call)) {
+                    AddListItem(std::move(call));
+                }
             }
+        }
+        catch (const SQLite::Exception& e)
+        {
+            OnAddCallError();
         }
     }
     else {
-        int nItem = FindListItem(call->id);
-        bool changed = false;
-        if (call->number != (numberLocal)) {
-            call->number = (numberLocal);
-            changed = true;
-            if (nItem != -1) {
-                m_list.SetItemText(nItem, MSIP_CALLS_COL_NUMBER, (call->number));
-            }
+        bool changedNumber = false;
+        bool changedName = false;
+        bool changedType = false;
+        if (call->number != numberLocal) {
+            call->number = numberLocal;
+            changedNumber = true;
         }
-        if (call->name != (name)) {
-            call->name = (name);
-            changed = true;
-            if (nItem != -1) {
-                m_list.SetItemText(nItem, MSIP_CALLS_COL_NAME, (call->name));
-            }
+        if (call->name != name) {
+            call->name = name;
+            changedName = true;
         }
         if (call->type != type) {
             call->type = type;
-            changed = true;
-            if (nItem != -1) {
-                m_list.SetItem(nItem, 0, LVIF_IMAGE, NULL, type, 0, 0, 0);
-            }
+            changedType = true;
         }
-        if (changed) {
-            m_callsService->UpdateCall(*call);
-            if (nItem != -1) {
-                Call* pCall = reinterpret_cast<Call*>(m_list.GetItemData(nItem));
-                delete pCall;
-                m_list.SetItemData(nItem, reinterpret_cast<DWORD_PTR>(call.release()));
+        if (changedNumber || changedName || changedType) {
+            try {
+                if (m_callsService->UpdateCall(*call)) {
+                    int nItem = FindListItem(call->id);
+                    if (nItem != -1) {
+                        if (changedNumber) {
+                            m_list.SetItemText(nItem, MSIP_CALLS_COL_NUMBER, call->number);
+                        }
+                        if (changedName) {
+                            m_list.SetItemText(nItem, MSIP_CALLS_COL_NAME, call->name);
+                        }
+                        if (changedType) {
+                            m_list.SetItem(nItem, 0, LVIF_IMAGE, NULL, type, 0, 0, 0);
+                        }
+                        Call* pCall = reinterpret_cast<Call*>(m_list.GetItemData(nItem));
+                        delete pCall;
+                        m_list.SetItemData(nItem, reinterpret_cast<DWORD_PTR>(call.release()));
+
+                    }
+                }
+            }
+            catch (const SQLite::Exception& e)
+            {
+                OnUpdateCallError();
             }
         }
     }
@@ -605,52 +663,100 @@ void Calls::Add(pj_str_t id, CString address, CString name, CString commands, in
 
 void Calls::DeleteAll()
 {
-    m_callsService->DeleteAllCalls();
-    CallsClear();
+    try {
+        m_callsService->DeleteAllCalls();
+        CallsClear();
+    }
+    catch (const SQLite::Exception& e)
+    {
+        OnDeleteAllCallsError();
+    }
 }
 
 void Calls::SetName(pj_str_t id, CString name)
 {
     CString callId = MSIP::PjToStr(&id);
-    std::unique_ptr<Call> call = m_callsService->GetCallByCallId((callId));
+    std::unique_ptr<Call> call = nullptr;
+    try {
+        call = m_callsService->GetCallByCallId(callId);
+    }
+    catch (const SQLite::Exception& e)
+    {
+        OnLoadCallError();
+        return;
+    }
     if (call) {
-        call->name = (name);
-        m_callsService->UpdateCall(*call);
-        int nItem = FindListItem(call->id);
-        if (nItem != -1) {
-            Call* pCall = reinterpret_cast<Call*>(m_list.GetItemData(nItem));
-            pCall->name = call->name;
-            m_list.SetItemText(nItem, MSIP_CALLS_COL_NAME, name);
+        call->name = name;
+        try {
+            m_callsService->UpdateCall(*call);
+            int nItem = FindListItem(call->id);
+            if (nItem != -1) {
+                Call* pCall = reinterpret_cast<Call*>(m_list.GetItemData(nItem));
+                pCall->name = call->name;
+                m_list.SetItemText(nItem, MSIP_CALLS_COL_NAME, name);
+            }
+        }
+        catch (const SQLite::Exception& e)
+        {
+            OnUpdateCallError();
         }
     }
 }
 
 void Calls::SetDuration(pj_str_t id, int sec, int total) {
     CString callId = MSIP::PjToStr(&id);
-    std::unique_ptr<Call> call = m_callsService->GetCallByCallId((callId));
+    std::unique_ptr<Call> call = nullptr;
+    try {
+        call = m_callsService->GetCallByCallId(callId);
+    }
+    catch (const SQLite::Exception& e)
+    {
+        OnLoadCallError();
+        return;
+    }
     if (call) {
         call->duration = sec;
-        m_callsService->UpdateCall(*call);
-        int nItem = FindListItem(call->id);
-        if (nItem != -1) {
-            Call* pCall = reinterpret_cast<Call*>(m_list.GetItemData(nItem));
-            pCall->duration = call->duration;
-            m_list.SetItemText(nItem, MSIP_CALLS_COL_DURATION, MSIP::GetDuration(call->duration));
+        try {
+            m_callsService->UpdateCall(*call);
+            int nItem = FindListItem(call->id);
+            if (nItem != -1) {
+                Call* pCall = reinterpret_cast<Call*>(m_list.GetItemData(nItem));
+                pCall->duration = call->duration;
+                m_list.SetItemText(nItem, MSIP_CALLS_COL_DURATION, MSIP::GetDuration(call->duration));
+            }
+        }
+        catch (const SQLite::Exception& e)
+        {
+            OnUpdateCallError();
         }
     }
 }
 
 void Calls::SetInfo(pj_str_t id, CString info) {
     CString callId = MSIP::PjToStr(&id);
-    std::unique_ptr<Call> call = m_callsService->GetCallByCallId((callId));
+    std::unique_ptr<Call> call = nullptr;
+    try {
+        call = m_callsService->GetCallByCallId(callId);
+    }
+    catch (const SQLite::Exception& e)
+    {
+        OnLoadCallError();
+        return;
+    }
     if (call) {
-        call->info = (info);
-        m_callsService->UpdateCall(*call);
-        int nItem = FindListItem(call->id);
-        if (nItem != -1) {
-            Call* pCall = reinterpret_cast<Call*>(m_list.GetItemData(nItem));
-            pCall->info = call->info;
-            m_list.SetItemText(nItem, MSIP_CALLS_COL_INFO, info);
+        call->info = info;
+        try {
+            m_callsService->UpdateCall(*call);
+            int nItem = FindListItem(call->id);
+            if (nItem != -1) {
+                Call* pCall = reinterpret_cast<Call*>(m_list.GetItemData(nItem));
+                pCall->info = call->info;
+                m_list.SetItemText(nItem, MSIP_CALLS_COL_INFO, info);
+            }
+        }
+        catch (const SQLite::Exception& e)
+        {
+            OnUpdateCallError();
         }
     }
 }
@@ -715,12 +821,81 @@ void Calls::CallsLoad()
     CEdit* edit = (CEdit*)GetDlgItem(IDC_FILER_VALUE);
     CString search;
     edit->GetWindowText(search);
-    auto calls = m_callsService->GetAllCalls();
-    for (auto& call : calls) {
-        if (!m_callsService->IsCallFiletered(*call, search)) {
-            AddListItem(std::move(call));
+    try {
+        auto calls = m_callsService->GetAllCalls();
+        for (auto& call : calls) {
+            if (!m_callsService->IsCallFiletered(*call, search)) {
+                AddListItem(std::move(call));
+            }
         }
+        m_list.SortColumn(m_list.GetSortColumn(), m_list.IsAscending());
     }
-    m_list.SortColumn(m_list.GetSortColumn(), m_list.IsAscending());
+    catch (const SQLite::Exception& e)
+    {
+        OnLoadHistoryError();
+    }
+}
+
+void Calls::OnLoadCallError()
+{
+    CString title = Translate(DatabaseAccessTitle);
+    CString message = Translate(_T("The call could not be loaded due to a database error."));
+    mainDlg->BaloonPopup(title, message);
+}
+
+void Calls::OnAddCallError()
+{
+    CString title = Translate(DatabaseWriteTitle);
+    CString message = Translate(_T("The call could not be added to call history."));
+    mainDlg->BaloonPopup(title, message);
+}
+
+void Calls::OnUpdateCallError()
+{
+    CString title = Translate(DatabaseWriteTitle);
+    CString message = Translate(_T("The call could not be updated in call history."));
+    mainDlg->BaloonPopup(title, message);
+}
+
+void Calls::OnImportHistoryError()
+{
+    CString title = Translate(DatabaseWriteTitle);
+    CString message = Translate(_T("Call history could not be imported due to a database error."));
+    mainDlg->BaloonPopup(title, message);
+}
+
+void Calls::OnExportHistoryError()
+{
+    CString title = Translate(DatabaseAccessTitle);
+    CString message = Translate(_T("Call history could not be exported due to a database error."));
+    mainDlg->BaloonPopup(title, message);
+}
+
+void Calls::OnDeleteCallError()
+{
+    CString title = Translate(DatabaseWriteTitle);
+    CString message = Translate(_T("The call could not be deleted from call history."));
+    mainDlg->BaloonPopup(title, message);
+}
+
+void Calls::OnDeleteCallsError()
+{
+    CString title = Translate(DatabaseWriteTitle);
+    CString message = Translate(_T("The selected calls could not be deleted from call history."));
+    mainDlg->BaloonPopup(title, message);
+}
+
+void Calls::OnDeleteAllCallsError()
+{
+    CString title = Translate(DatabaseWriteTitle);
+    CString message = Translate(_T("Call history could not be cleared due to a database error."));
+    mainDlg->BaloonPopup(title, message);
+}
+
+void Calls::OnLoadHistoryError()
+{
+    CString title = Translate(DatabaseAccessTitle);
+    CString message = Translate(_T("Call history could not be loaded due to a database error."));
+    mainDlg->BaloonPopup(title, message);
 }
 

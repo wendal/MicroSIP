@@ -1,9 +1,9 @@
 # MicroSIP — self-contained build
 
-MicroSIP 3.22.16, the open-source SIP softphone, packaged so that **one
+MicroSIP 3.23.5, the open-source SIP softphone, packaged so that **one
 clone is enough to build the executable**.
 
-The official source release (`MicroSIP-3.22.16-src.7z`) contains only the
+The official source release (`MicroSIP-3.23.5-src.7z`) contains only the
 application sources. `microsip.vcxproj` expects to sit next to a full
 dependency tree that upstream does not ship:
 
@@ -68,6 +68,18 @@ two features switched on that the official 32-bit release does not have:
 
 Both are guarded by `#if defined(_M_X64)` in `pj\config_site.h`, so the Win32
 build keeps seeing exactly the feature set of the library it links against.
+
+### pjproject version
+
+Upstream MicroSIP 3.23.x ships with **pjproject 2.17**. This repository keeps
+the **2.14.1** tree it has always vendored, because the only prebuilt 32-bit
+library that ships with MicroSIP is a 2.14.1 build and rebuilding pjproject
+for Win32 is out of scope.
+
+The single API difference that the 3.23.5 sources depend on is the name of a
+compile-time constant: pjproject 2.15 renamed `PJMEDIA_AUD_MAX_DEVS` to
+`PJMEDIA_AUD_DEV_MAX_DEVS`. Both default to 64, so `pj\config_site.h` maps the
+new name onto the old one — see `BUILD.md` §13.
 
 ## Layout
 

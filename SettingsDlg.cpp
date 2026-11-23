@@ -100,9 +100,9 @@ BOOL SettingsDlg::OnInitDialog()
     combobox = (CComboBox*)GetDlgItem(IDC_SETTINGS_MICROPHONE);
     combobox->AddString(Translate(_T("Default")));
     combobox->SetCurSel(0);
-    pjmedia_aud_dev_info aud_dev_info[PJMEDIA_AUD_MAX_DEVS];
+    pjmedia_aud_dev_info aud_dev_info[PJMEDIA_AUD_DEV_MAX_DEVS];
     if (is_pjsua_running()) {
-        count = PJMEDIA_AUD_MAX_DEVS;
+        count = PJMEDIA_AUD_DEV_MAX_DEVS;
         pjsua_enum_aud_devs(aud_dev_info, &count);
     }
     else {

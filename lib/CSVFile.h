@@ -6,6 +6,7 @@ class CCSVFile : public CStdioFileEx
 {
 public:
   CCSVFile();
+  ~CCSVFile();
   bool ReadData(CStringArray &arr);
   void WriteData(CStringArray &arr);
 };

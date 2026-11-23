@@ -28,12 +28,17 @@
 #include <string>
 #include <iostream>
 
-CallsService::CallsService(std::unique_ptr<ICallsRepository> repository)
+CallsService::CallsService(std::unique_ptr<CallsRepository> repository)
     : m_repository(std::move(repository))
 {
-    auto calls = m_repository->GetAll(1);
-    if (!calls.size()) {
-        calls = IniCopyCalls();
+    try {
+        auto calls = m_repository->GetAll(1);
+        if (!calls.size()) {
+            calls = IniCopyCalls();
+        }
+    }
+    catch (const SQLite::Exception& e)
+    {
     }
 }
 
@@ -82,12 +87,13 @@ int CallsService::AddCall(Call& call)
     return newId;
 }
 
-void CallsService::UpdateCall(const Call& call)
+bool CallsService::UpdateCall(const Call& call)
 {
     if (!Validate(call)) {
-        return;
+        return false;
     }
     m_repository->Update(call);
+    return true;
 }
 
 void CallsService::DeleteCall(int id)
@@ -123,17 +129,14 @@ std::vector<std::unique_ptr<Call>> CallsService::GetAllCalls()
 bool CallsService::IsCallFiletered(const Call& call, CString search) {
     if (!search.IsEmpty()) {
         search.MakeLower();
-        CString name = call.name;
         CString number = call.number;
-        name.MakeLower();
         number.MakeLower();
-        if (name.Find(search) == -1 && number.Find(search) == -1) {
+        if (number.Find(search) == -1 && FindInsensitive(call.name, search) == -1) {
             return true;
         }
     }
     return false;
 }
-
 
 void CallsService::ExportCallsCSV(CString filename, CString search)
 {
@@ -196,93 +199,94 @@ std::string CallsService::ImportCallsCSV(CString filename)
         int infoIndex = -1;
         bool bHeader = true;
 
-        m_repository->BeginTransaction();
+        m_repository->ExecuteTransaction([&]()
+            {
+                int nLine = 1;
 
-        int nLine = 1;
-
-        while (CSVFile.ReadData(arr)) {
-            if (bHeader) {
-                for (int i = 0; i < arr.GetCount(); i++) {
-                    CString s = arr.GetAt(i);
-                    if (callIdIndex == -1 && s == _T("ID")) {
-                        callIdIndex = i;
+                while (CSVFile.ReadData(arr)) {
+                    if (bHeader) {
+                        for (int i = 0; i < arr.GetCount(); i++) {
+                            CString s = arr.GetAt(i);
+                            if (callIdIndex == -1 && s == _T("ID")) {
+                                callIdIndex = i;
+                            }
+                            else if (typeIndex == -1 && s == _T("Type")) {
+                                typeIndex = i;
+                            }
+                            else if (nameIndex == -1 && s == _T("Name")) {
+                                nameIndex = i;
+                            }
+                            else if (numberIndex == -1 && s == _T("Number")) {
+                                numberIndex = i;
+                            }
+                            else if (timeIndex == -1 && s == _T("Timestamp")) {
+                                timeIndex = i;
+                            }
+                            else if (durationIndex == -1 && s == _T("Duration")) {
+                                durationIndex = i;
+                            }
+                            else if (infoIndex == -1 && s == _T("Info")) {
+                                infoIndex = i;
+                            }
+                        }
+                        if (callIdIndex == -1 ||
+                            typeIndex == -1 ||
+                            nameIndex == -1 ||
+                            numberIndex == -1 ||
+                            timeIndex == -1
+                            ) {
+                            result = "The received data cannot be recognized";
+                            break;
+                        }
+                        bHeader = false;
                     }
-                    else if (typeIndex == -1 && s == _T("Type")) {
-                        typeIndex = i;
+                    else {
+                        Call call;
+                        if (callIdIndex != -1 && arr.GetCount() > callIdIndex) {
+                            call.callId = (arr.GetAt(callIdIndex));
+                        }
+                        if (typeIndex != -1 && arr.GetCount() > typeIndex) {
+                            call.type = _wtoi(arr.GetAt(typeIndex));
+                        }
+                        if (nameIndex != -1 && arr.GetCount() > nameIndex) {
+                            call.name = (arr.GetAt(nameIndex));
+                        }
+                        if (numberIndex != -1 && arr.GetCount() > numberIndex) {
+                            call.number = (arr.GetAt(numberIndex));
+                        }
+                        if (timeIndex != -1 && arr.GetCount() > timeIndex) {
+                            call.time = _wtoi(arr.GetAt(timeIndex));
+                        }
+                        if (durationIndex != -1 && arr.GetCount() > durationIndex) {
+                            call.duration = _wtoi(arr.GetAt(durationIndex));
+                        }
+                        if (infoIndex != -1 && arr.GetCount() > infoIndex) {
+                            call.info = (arr.GetAt(infoIndex));
+                        }
+                        std::string err;
+                        if (Validate(call, &err)) {
+                            if (!m_repository->GetByCallId(call.callId)) {
+                                m_repository->Add(call);
+                            }
+                        }
+                        else {
+                            result = "Error in line " + std::to_string(nLine) + "\r\n\r\n" + err + "\r\n\r\n";
+                            for (int i = 0; i < arr.GetCount(); i++) {
+                                if (i != 0) result += ",";
+                                result += CStringToUtf8(arr.GetAt(i));
+                            }
+                            break;
+                        }
                     }
-                    else if (nameIndex == -1 && s == _T("Name")) {
-                        nameIndex = i;
-                    }
-                    else if (numberIndex == -1 && s == _T("Number")) {
-                        numberIndex = i;
-                    }
-                    else if (timeIndex == -1 && s == _T("Timestamp")) {
-                        timeIndex = i;
-                    }
-                    else if (durationIndex == -1 && s == _T("Duration")) {
-                        durationIndex = i;
-                    }
-                    else if (infoIndex == -1 && s == _T("Info")) {
-                        infoIndex = i;
-                    }
+                    nLine++;
                 }
-                if (callIdIndex == -1 ||
-                    typeIndex == -1 ||
-                    nameIndex == -1 ||
-                    numberIndex == -1 ||
-                    timeIndex == -1
-                    ) {
-                    result = "The received data cannot be recognized";
-                    break;
-                }
-                bHeader = false;
-            }
-            else {
-                Call call;
-                if (callIdIndex != -1 && arr.GetCount() > callIdIndex) {
-                    call.callId = (arr.GetAt(callIdIndex));
-                }
-                if (typeIndex != -1 && arr.GetCount() > typeIndex) {
-                    call.type = _wtoi(arr.GetAt(typeIndex));
-                }
-                if (nameIndex != -1 && arr.GetCount() > nameIndex) {
-                    call.name = (arr.GetAt(nameIndex));
-                }
-                if (numberIndex != -1 && arr.GetCount() > numberIndex) {
-                    call.number = (arr.GetAt(numberIndex));
-                }
-                if (timeIndex != -1 && arr.GetCount() > timeIndex) {
-                    call.time = _wtoi(arr.GetAt(timeIndex));
-                }
-                if (durationIndex != -1 && arr.GetCount() > durationIndex) {
-                    call.duration = _wtoi(arr.GetAt(durationIndex));
-                }
-                if (infoIndex != -1 && arr.GetCount() > infoIndex) {
-                    call.info = (arr.GetAt(infoIndex));
-                }
-                std::string err;
-                if (Validate(call, &err)) {
-                    if (!m_repository->GetByCallId(call.callId)) {
-                        m_repository->Add(call);
-                    }
+                if (result.empty()) {
+                    return true;
                 }
                 else {
-                    result = "Error in line " + std::to_string(nLine) + "\r\n\r\n" + err + "\r\n\r\n";
-                    for (int i = 0; i < arr.GetCount(); i++) {
-                        if (i != 0) result += ",";
-                        result += CStringToUtf8(arr.GetAt(i));
-                    }
-                    break;
+                    return false;
                 }
-            }
-            nLine++;
-        }
-        if (result.empty()) {
-            m_repository->Commit();
-        }
-        else {
-            m_repository->Rollback();
-        }
+            });
         CSVFile.Close();
     }
     return result;
@@ -381,10 +385,15 @@ std::vector<std::unique_ptr<Call>> CallsService::IniCopyCalls()
         {
             return a->time < b->time;
         });
-    for (auto& pCall : calls) {
-        m_repository->Add(*pCall);
-    }
-    WritePrivateProfileSection(_T("Calls"), NULL, accountSettings.iniFile);
-    WritePrivateProfileString(_T("Settings"), _T("callsLastKey"), NULL, accountSettings.iniFile);
+
+        m_repository->ExecuteTransaction([&]()
+            {
+                for (auto& pCall : calls) {
+                    m_repository->Add(*pCall);
+                }
+                return true;
+            });
+        WritePrivateProfileSection(_T("Calls"), NULL, accountSettings.iniFile);
+        WritePrivateProfileString(_T("Settings"), _T("callsLastKey"), NULL, accountSettings.iniFile);
     return calls;
 }

@@ -31,6 +31,9 @@ namespace MFC
 		virtual bool Encrypt(const CString& str, CByteArray& arData);
 		virtual bool Decrypt(const CByteArray& arData, CString& str);
 
+        virtual bool EncryptA(const CStringA& str1, CByteArray& arData);
+        virtual bool DecryptA(const CByteArray& arData, CStringA& str1);
+
 
 	protected:
 

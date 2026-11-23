@@ -20,6 +20,7 @@ stores them.
 | `src\opus-1.3.1.zip` | Opus codec source | upstream release archive (git-lfs) |
 | `src\bcg729.zip` | G.729 codec source | upstream archive (git-lfs) |
 | `src\SQLiteCpp-3.4.0.zip` | SQLite wrapper source | upstream release archive (git-lfs) |
+| `src\MicroSIP-3.23.5-src.7z` | the application sources this repository was updated from — the provenance record of the 3.23.5 update | upstream release archive (git-lfs) |
 | `MANIFEST.txt` | SHA-256 of every vendored archive | generated |
 
 The headers were verified to be **byte-identical to upstream pjproject

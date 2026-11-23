@@ -17,10 +17,11 @@
  */
 
 #pragma once
-#include "IContactsRepository.h"
 #include <SQLiteCpp/SQLiteCpp.h>
+#include "../domain/Contact.h"
+#include <vector>
 
-class ContactsRepository : public IContactsRepository
+class ContactsRepository
 {
 public:
     explicit ContactsRepository(SQLite::Database& db);
@@ -29,14 +30,14 @@ public:
     void Commit();
     void Rollback();    
 
-    int Add(const Contact& contact) override;
-    void Update(const Contact& contact) override;
-    void Delete(int id) override;
-    void DeleteAll() override;
+    int Add(const Contact& contact);
+    void Update(const Contact& contact);
+    void Delete(int id);
+    void DeleteAll();
 
-    std::unique_ptr<Contact> GetById(int id) override;
+    std::unique_ptr<Contact> GetById(int id);
     std::unique_ptr<Contact> GetByContactId(const std::string& contactId);
-    std::vector<std::unique_ptr<Contact>> GetAll() override;
+    std::vector<std::unique_ptr<Contact>> GetAll();
 
 private:
     SQLite::Database& m_db;

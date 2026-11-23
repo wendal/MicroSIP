@@ -577,11 +577,12 @@ void MSIP::CommandLineToShell(CString cmd, CString& command, CString& params)
     params.Empty();
     int nArgs;
     LPWSTR* szArglist = CommandLineToArgvW(cmd, &nArgs);
-    if (NULL == szArglist) {
+    if (!szArglist) {
         AfxMessageBox(_T("Wrong command: ") + cmd);
+        return;
     }
-    else for (int i = 0; i < nArgs; i++) {
-        if (!i) {
+    for (int i = 0; i < nArgs; i++) {
+        if (i == 0) {
             command = szArglist[i];
         }
         else {
@@ -590,34 +591,6 @@ void MSIP::CommandLineToShell(CString cmd, CString& command, CString& params)
     }
     params.TrimRight();
     LocalFree(szArglist);
-}
-
-void MSIP::RunCmd(const CString& cmdLine, const CString& addParams, bool noWait)
-{
-    CString str, command, params;
-    //if (cmdLine.Find('"') == -1) {
-    //CString tmp = cmdLine;
-    //cmdLine.Format(_T("\"%s\""), tmp);
-    //}
-    CommandLineToShell(cmdLine, command, params);
-    params.AppendFormat(_T(" %s"), addParams);
-    params.TrimLeft();
-
-    SHELLEXECUTEINFO ShExecInfo = { 0 };
-    ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFO);
-    ShExecInfo.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
-    ShExecInfo.hwnd = NULL;
-    ShExecInfo.lpVerb = NULL;
-    ShExecInfo.lpFile = command;
-    ShExecInfo.lpParameters = params;
-    ShExecInfo.lpDirectory = NULL;
-    ShExecInfo.nShow = SW_HIDE;
-    ShExecInfo.hInstApp = NULL;
-    ShellExecuteEx(&ShExecInfo);
-    if (!noWait) {
-        DWORD res = WaitForSingleObject(ShExecInfo.hProcess, 10000);
-    }
-    CloseHandle(ShExecInfo.hProcess);
 }
 
 bool MSIP::IsNat64(const sockaddr_in6* addr)
@@ -738,6 +711,34 @@ void MSIP::PortKnock()
     }
 
     freeaddrinfo(result);
+}
+
+void MSIP::RunCmdCOM(const CString& cmdLine, const CString& addParams, bool noWait)
+{
+    CString command, params;
+    //if (cmdLine.Find('"') == -1) {
+    //CString tmp = cmdLine;
+    //cmdLine.Format(_T("\"%s\""), tmp);
+    //}
+    CommandLineToShell(cmdLine, command, params);
+    params.AppendFormat(_T(" %s"), addParams);
+    params.TrimLeft();
+
+    SHELLEXECUTEINFO ShExecInfo = { 0 };
+    ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFO);
+    ShExecInfo.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
+    ShExecInfo.hwnd = NULL;
+    ShExecInfo.lpVerb = NULL;
+    ShExecInfo.lpFile = command;
+    ShExecInfo.lpParameters = params;
+    ShExecInfo.lpDirectory = NULL;
+    ShExecInfo.nShow = SW_HIDE;
+    ShExecInfo.hInstApp = NULL;
+    ShellExecuteEx(&ShExecInfo);
+    if (!noWait) {
+        DWORD res = WaitForSingleObject(ShExecInfo.hProcess, 10000);
+    }
+    CloseHandle(ShExecInfo.hProcess);
 }
 
 bool MSIP::IsConnectedToNetworkCOM(bool bCheckInternet)

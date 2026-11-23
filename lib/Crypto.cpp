@@ -189,6 +189,52 @@ bool CCrypto::Decrypt(const CByteArray& arData, CString& str)
 	return true;
 }
 
+
+bool CCrypto::EncryptA(const CStringA& str, CByteArray& arData)
+{
+    //	Return failure if we don't have a context or key.
+    if (m_hCryptProv == NULL || m_hKey == NULL)
+        return false;
+
+    //	Before we write to the file, trash it.
+    m_file.SetLength(0);
+
+    //	Create a storing archive from the memory file.
+    CArchive ar(&m_file, CArchive::store);
+
+    //	Write the string to the memory file.
+    ar << str;
+
+    //	Close the archive, flushing the write.
+    ar.Close();
+
+    //	Encrypt the contents of the memory file and store the result in the array.
+    return InternalEncrypt(arData);
+}
+
+bool CCrypto::DecryptA(const CByteArray& arData, CStringA& str)
+{
+    //	Return failure if we don't have a context or key.
+    if (m_hCryptProv == NULL || m_hKey == NULL)
+        return false;
+
+    //	Decrypt the contents of the array to the memory file.
+    if (InternalDecrypt(arData) == false)
+        return false;
+
+    //	Create a reading archive from the memory file.
+    CArchive ar(&m_file, CArchive::load);
+
+    //	Read the data from the memory file.
+    ar >> str;
+
+    //	Close the archive.
+    ar.Close();
+
+    //	And we're done.
+    return true;
+}
+
 bool CCrypto::InternalEncrypt(CByteArray& arDestination)
 {
 	//	Get the length of the data in memory. Increase the capacity to handle the size of the encrypted data.

@@ -347,7 +347,7 @@ MessagesContact* MessagesDlg::AddTab(CString address, BOOL activate, pjsua_call_
     MessagesContact* messagesContact = nullptr;
 
     SIPURI sipuri;
-    ParseCallSIPURI(address, user_data, sipuri);
+    ParseCallSIPURI(address, user_data, sipuri, call_info && call_info->role == PJSIP_ROLE_UAS);
 
     //-- incoming call
     if (call_info && call_info->role == PJSIP_ROLE_UAS) {
@@ -693,7 +693,13 @@ pjsua_call_id MessagesDlg::PerformCall(CString number, bool hasVideo, pj_status_
         }
 #ifdef _GLOBAL_VIDEO
         if (hasVideo) {
-            mainDlg->createPreviewWin();
+            if (!mainDlg->CameraPermissions()) {
+                if (pStatus) {
+                    *pStatus = PJSIP_ERRNO_START_PJSIP;
+                }
+                break;
+            }
+            mainDlg->CreatePreviewWin();
         }
 #endif
         msip_set_sound_device(msip_audio_output);
@@ -821,7 +827,7 @@ MessagesContact* MessagesDlg::StartCall(bool hasVideo, call_user_data* user_data
     }
     else {
         user_data = nullptr; // the old object is deleted
-        if (status != PJ_ERESOLVE) {
+        if (status != PJ_ERESOLVE && status != PJSIP_ERRNO_START_PJSIP) {
             CString descr;
             CString message = MSIP::GetErrorMessage(status, descr);
             if (message.IsEmpty() || PJ_STATUS_TO_OS(status) == ERROR_INVALID_PARAMETER) {
@@ -881,12 +887,12 @@ void MessagesDlg::OnEndCall(pjsua_call_info* call_info, call_user_data* user_dat
     bool bError = true;
     bool elsewhere = false;
     if (call_info->state != PJSIP_INV_STATE_DISCONNECTED || call_info->last_status == 200) {
-        info = _T("Call Ended");
+        info = _T("Call ended");
         bError = false;
     }
     else {
         if (call_info->last_status == 404) {
-            info = _T("Incorrect dialing or non-existent number.");
+            info = _T("Incorrect dialing or non-existent number");
         }
         else if (call_info->last_status == 487) {
             info = _T("Canceled");
@@ -902,7 +908,7 @@ void MessagesDlg::OnEndCall(pjsua_call_info* call_info, call_user_data* user_dat
             }
         }
         else if (call_info->last_status == 488) {
-            info = _T("Unsupported codecs, encryption methods, or other media parameters.");
+            info = _T("Unsupported codecs, encryption methods, or other media parameters");
         }
         else {
             CString rab = MSIP::PjToStr(&call_info->last_status_text);
@@ -969,10 +975,10 @@ void MessagesDlg::OnEndCall(pjsua_call_info* call_info, call_user_data* user_dat
                 info = _T("Declined");
             }
             else if (elsewhere) {
-                info = _T("Answered Elsewhere");
+                info = _T("Answered elsewhere");
             }
             else if (info.IsEmpty()) {
-                info = _T("Missed Call");
+                info = _T("Missed call");
             }
         }
     }
@@ -1023,7 +1029,6 @@ void MessagesDlg::OnEndCall(pjsua_call_info* call_info, call_user_data* user_dat
 
     CString message;
     if (bError) {
-        CString message;
         message.Format(_T("%s %s"), Translate(_T("Call failed:")), info);
     }
     else {
@@ -1067,7 +1072,7 @@ void MessagesDlg::OnEndCall(pjsua_call_info* call_info, call_user_data* user_dat
         //--
         if (!accountSettings.cmdCallBusy.IsEmpty()) {
             CString params = numberLocal;
-            MSIP::RunCmd(accountSettings.cmdCallBusy, params);
+            mainDlg->PostRunCmd(accountSettings.cmdCallBusy, params);
         }
         //--
     }
@@ -1075,7 +1080,7 @@ void MessagesDlg::OnEndCall(pjsua_call_info* call_info, call_user_data* user_dat
         //--
         if (!accountSettings.cmdCallEnd.IsEmpty()) {
             CString params = numberLocal;
-            MSIP::RunCmd(accountSettings.cmdCallEnd, params);
+            mainDlg->PostRunCmd(accountSettings.cmdCallEnd, params);
         }
         //--
         //--
@@ -1143,8 +1148,6 @@ void MessagesDlg::UpdateHoldButton(pjsua_call_info* call_info)
     CButton* buttonTransfer = (CButton*)GetDlgItem(IDC_TRANSFER);
     CButton* buttonConference = (CButton*)GetDlgItem(IDC_CONFERENCE);
     CButton* buttonHold = (CButton*)GetDlgItem(IDC_HOLD);
-    CButton* buttonHoldDialer = (CButton*)mainDlg->pageDialer->GetDlgItem(IDC_HOLD);
-    CButton* buttonTransferDialer = (CButton*)mainDlg->pageDialer->GetDlgItem(IDC_TRANSFER);
     if (messagesContact->callId != -1 && call_info) {
         if (messagesContact->callId != call_info->id) {
             return;
@@ -1168,35 +1171,35 @@ void MessagesDlg::UpdateHoldButton(pjsua_call_info* call_info)
     if (hasActions) {
         buttonTransfer->ShowWindow(SW_SHOW);
         buttonConference->ShowWindow(SW_SHOW);
-        buttonTransferDialer->EnableWindow(TRUE);
+        mainDlg->pageDialer->m_ButtonTransfer.EnableWindow(TRUE);
     }
     else {
         buttonTransfer->ShowWindow(SW_HIDE);
         buttonConference->ShowWindow(SW_HIDE);
-        buttonTransferDialer->EnableWindow(FALSE);
+        mainDlg->pageDialer->m_ButtonTransfer.EnableWindow(FALSE);
     }
     mainDlg->pageDialer->EnableButtonCONF(hasActions);
     //--
     if (hasHold) {
         buttonHold->ShowWindow(SW_SHOW);
-        buttonHoldDialer->EnableWindow(TRUE);
+        mainDlg->pageDialer->m_ButtonHold.EnableWindow(TRUE);
     }
     else {
         buttonHold->ShowWindow(SW_HIDE);
-        buttonHoldDialer->EnableWindow(FALSE);
+        mainDlg->pageDialer->m_ButtonHold.EnableWindow(FALSE);
     }
     //--
     if (onHold) {
         buttonHold->SetCheck(TRUE);
         buttonHold->SetIcon(m_hIconResume);
-        buttonHoldDialer->SetCheck(TRUE);
-        buttonHoldDialer->SetIcon(mainDlg->pageDialer->m_hIconResume);
+        mainDlg->pageDialer->m_ButtonHold.SetCheck(TRUE);
+        mainDlg->pageDialer->m_ButtonHold.SetIcon(mainDlg->pageDialer->m_hIconResume);
     }
     else {
         buttonHold->SetCheck(FALSE);
         buttonHold->SetIcon(m_hIconHold);
-        buttonHoldDialer->SetCheck(FALSE);
-        buttonHoldDialer->SetIcon(mainDlg->pageDialer->m_hIconHold);
+        mainDlg->pageDialer->m_ButtonHold.SetCheck(FALSE);
+        mainDlg->pageDialer->m_ButtonHold.SetIcon(mainDlg->pageDialer->m_hIconHold);
     }
     //--
 }

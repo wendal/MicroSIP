@@ -30,6 +30,9 @@
 #include <Psapi.h>
 #include <atomic>
 
+#include "afxvisualmanager.h"
+#include "afxvisualmanagerwindows.h"
+
 #pragma warning(push)
 #pragma warning(disable : 4091)
 #include <Dbghelp.h>
@@ -302,14 +305,15 @@ LONG WINAPI ExceptionFilter(EXCEPTION_POINTERS* ExceptionInfo)
             root["autoHangUpTime"] = accountSettings.autoHangUpTime;
             root["forceCodec"] = accountSettings.forceCodec;
             root["publicAddr"] = MSIP::Utf8EncodeUni(accountSettings.account.publicAddr).GetString();
+            root["ICE"] = accountSettings.account.ice;
             root["audioInputDevice"] = MSIP::Utf8EncodeUni(accountSettings.audioInputDevice).GetString();
             root["audioOutputDevice"] = MSIP::Utf8EncodeUni(accountSettings.audioOutputDevice).GetString();
             root["audioRingDevice"] = MSIP::Utf8EncodeUni(accountSettings.audioRingDevice).GetString();
             root["pjsua_state"] = pjsua_get_state();
             if (root["pjsua_state"] == PJSUA_STATE_RUNNING) {
                 CStringA audDevNames;
-                pjmedia_aud_dev_info aud_dev_info[PJMEDIA_AUD_MAX_DEVS];
-                UINT count = PJMEDIA_AUD_MAX_DEVS;
+                pjmedia_aud_dev_info aud_dev_info[PJMEDIA_AUD_DEV_MAX_DEVS];
+                UINT count = PJMEDIA_AUD_DEV_MAX_DEVS;
                 pjsua_enum_aud_devs(aud_dev_info, &count);
                 for (unsigned i = 0; i < count; i++)
                 {
@@ -805,6 +809,15 @@ BOOL CmicrosipApp::InitInstance()
         }
         else if (time > timeBuild + 86400 * lifeTime1) {
             notifyUpdate = 1;
+        }
+
+        // modern drawing of the CMFCButton border
+        CRuntimeClass* pClass = RUNTIME_CLASS(CMFCVisualManagerWindows);
+        CObject* pOblect = pClass->CreateObject();
+        if (pOblect) {
+            delete pOblect;
+            CMFCVisualManager::SetDefaultManager(pClass);
+            CMFCVisualManager::GetInstance();
         }
 
         CmainDlg* mainDlg = new CmainDlg;

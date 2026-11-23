@@ -50,6 +50,12 @@ private:
 	void CallsLoad();
 
 private:
+    static constexpr auto DatabaseAccessTitle =
+        L"Database Access Error";
+
+    static constexpr auto DatabaseWriteTitle =
+        L"Database Write Error";
+
     CallsService* m_callsService = nullptr;
     CListCtrl_SortItemsEx m_list;
 	CImageList* imageList;
@@ -62,8 +68,15 @@ private:
     void ReloadTime();
     bool IsFiltered(const Call& call);
     void FilterReset();
-
-
+    void OnLoadCallError();
+    void OnAddCallError();
+    void OnUpdateCallError();
+    void OnImportHistoryError();
+    void OnExportHistoryError();
+    void OnDeleteCallError();
+    void OnDeleteCallsError();
+    void OnDeleteAllCallsError();
+    void OnLoadHistoryError();
 protected:
 	virtual BOOL OnInitDialog();
 	afx_msg void OnTimer(UINT_PTR TimerVal);

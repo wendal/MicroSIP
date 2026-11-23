@@ -27,7 +27,7 @@
 #include <string>
 #include <iostream>
 
-ContactsService::ContactsService(std::unique_ptr<IContactsRepository> repository)
+ContactsService::ContactsService(std::unique_ptr<ContactsRepository> repository)
     : m_repository(std::move(repository))
 {
 }
@@ -65,16 +65,12 @@ bool ContactsService::ContactPrepare(Contact& contact)
 
 }
 
-
-
 bool ContactsService::IsContactFiletered(const Contact& contact, CString search) {
     if (!search.IsEmpty()) {
         search.MakeLower();
-        CString name = contact.name;
         CString number = contact.number;
-        name.MakeLower();
         number.MakeLower();
-        if (name.Find(search) == -1 && number.Find(search) == -1) {
+        if (number.Find(search) == -1 && FindInsensitive(contact.name, search) == -1) {
             return true;
         }
     }

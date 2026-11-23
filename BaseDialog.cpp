@@ -71,21 +71,21 @@ BOOL CBaseDialog::PreTranslateMessage(MSG* pMsg)
 						catched = true;
 					}
 				}
-				if (pMsg->wParam == 'M') {
-					postCommand = ID_ACCOUNT_EDIT_RANGE;
-				}
-				if (pMsg->wParam == 'L') {
-					postCommand = ID_ACCOUNT_EDIT_LOCAL;
-				}
-				if (pMsg->wParam == 'P') {
-					postCommand = ID_SETTINGS;
-				}
-				if (pMsg->wParam == 'S') {
-					postCommand = ID_SHORTCUTS;
-				}
-				if (pMsg->wParam == 'Q') {
-					postCommand = ID_EXIT;
-				}
+                if (pMsg->wParam == 'M') {
+                    postCommand = ID_ACCOUNT_EDIT_RANGE;
+                }
+                if (pMsg->wParam == 'L') {
+                    postCommand = ID_ACCOUNT_EDIT_LOCAL;
+                }
+                if (pMsg->wParam == 'P') {
+                    postCommand = ID_SETTINGS;
+                }
+                if (pMsg->wParam == 'S') {
+                    postCommand = ID_SHORTCUTS;
+                }
+                if (pMsg->wParam == 'Q') {
+                    postCommand = ID_EXIT;
+                }
 				if (pMsg->wParam == VK_OEM_3 || pMsg->wParam == 'I') {
 					postCommand = ID_MUTE_INPUT;
 				}

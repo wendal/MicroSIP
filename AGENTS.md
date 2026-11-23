@@ -1,6 +1,6 @@
 # AGENTS.md
 
-MicroSIP 3.22.16 — a MFC SIP softphone, packaged so that one clone builds the
+MicroSIP 3.23.5 — a MFC SIP softphone, packaged so that one clone builds the
 executable. The application sources are upstream; everything else in this
 repository exists to make `build\build.ps1` work end to end.
 
@@ -72,6 +72,23 @@ the output.
 - **`microsip.vcxproj` is CRLF + UTF-8-BOM.** Edit it byte-wise (a script that
   reads and writes raw bytes), never with a text editor that rewrites the
   encoding.
+- **`mainDlg.h` carries a local patch; upstream does not.** Upstream binds the
+  pjproject static library by name and hardcodes the **32-bit** artefact. The
+  repository makes that selection architecture aware (`_M_X64` →
+  `libpjproject-x86_64-x64-vc14-*.lib`) and adds `#pragma comment(lib,
+  "opus.lib")`. Overwriting `mainDlg.h` with an upstream copy silently pulls in
+  `libpjproject-i386-…-Static.lib`; the linker then reports `LNK4272` and a
+  flood of unresolved `pjsua_*` symbols that have nothing to do with the code.
+  When updating from an upstream release, re-apply this block.
+- **The vendored pjproject is 2.14.1; upstream 3.23.x ships 2.17.** The one API
+  difference the 3.23.5 sources depend on is the rename of the compile-time
+  constant `PJMEDIA_AUD_MAX_DEVS` → `PJMEDIA_AUD_DEV_MAX_DEVS` (both 64). The
+  generator maps the new name onto the old one in `pj\config_site.h` — see
+  `BUILD.md` §13.
+- **Source files must keep their UTF-8 BOM.** The machine's ANSI code page is
+  936 (GBK). MSVC reads a BOM-less file as ACP, so the `·` (U+00B7) and `–`
+  (U+2013) literals in `mainDlg.cpp` are mis-decoded and `C4819` is emitted.
+  Upstream 3.23.5 ships `mainDlg.cpp` without the BOM; put it back.
 
 ## Testing and verification
 
