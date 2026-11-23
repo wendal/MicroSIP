@@ -8,7 +8,7 @@ The official release archive (`MicroSIP-3.23.5-src.7z`, downloadable from
 <build-root>/
 ├─ build/vs/pjproject-vs14-common-config.props   (imported by microsip.vcxproj)
 ├─ third_party/…                                 (pjsip headers, SQLiteCpp, libs)
-├─ lib/                                          (prebuilt static libs)
+├─ lib/                                          (static libs)
 └─ MicroSIP-3.23.5-src/                         (this repository)
 ```
 
@@ -35,7 +35,7 @@ MicroSIP-3.23.5-src\
 │  └─ work\             unpacked sources and intermediate objects (git-ignored)
 ├─ third_party\         the dependency tree (details in third_party\README.md)
 │  ├─ src\              source archives, tracked with git-lfs
-│  ├─ lib\              the prebuilt 32-bit pjproject library + the generated x64 ones
+│  ├─ lib\              build output: the pjproject and helper archives (git-ignored)
 │  ├─ pj\, pjsip\ …     the pjproject headers, flattened
 │  └─ MANIFEST.txt      SHA-256 of every vendored archive
 ├─ tools\               verification scripts (not part of the build)
@@ -58,27 +58,34 @@ cd microsip
 
 | Dependency | Source |
 |---|---|
-| `build/vs/pjproject-vs14-common-config.props` (+ `…-api-def.props`) | **Verbatim from upstream pjproject 2.14.1** — pjproject's own VS property sheet, not a private file. See §3 and §9. |
-| `third_party\pj\`, `third_party\pjsip\`, … (pjproject headers) | **Stock upstream pjproject 2.14.1** (verified in §9), taken from the official dependency repository `github.com/guilhermejansen/MicroSIP-Com-Deps` (branch `master`) which publishes exactly this flattened `third_party/` tree. The author's own workspace tree `github.com/pythonist77/microsip` is a pjproject checkout of the 2.8→2.9 development window (2019) with `MicroSIP-3.19.17-src/` inside it — upstream trunk, not a private fork. |
-| `third_party\lib\libpjproject-i386-Win32-vc14-Debug-Static.lib` | The same repository — the prebuilt 32-bit pjproject library. The Win32 build of the application links it (rebuilding pjproject for Win32 is out of scope). |
-| `third_party\src\pjproject-2.14.1.zip` | Upstream pjproject release archive — compiled for x64 by the pipeline. |
+| `build/vs/pjproject-vs14-common-config.props` (+ `…-api-def.props`) | **Verbatim from upstream pjproject** — pjproject's own VS property sheet, not a private file. See §3 and §9. |
+| `third_party\pj\`, `third_party\pjsip\`, … (pjproject headers) | **Stock upstream pjproject 2.17** (verified in §9), flattened out of the release archive by `build\import-deps.ps1`. The author's own workspace tree `github.com/pythonist77/microsip` is a pjproject checkout of the 2.8→2.9 development window (2019) with `MicroSIP-3.19.17-src/` inside it — upstream trunk, not a private fork. |
+| `third_party\src\pjproject-2.17.zip` | Upstream pjproject release archive — the **single source** of both the headers and the static library; the pipeline compiles it for every platform (§10). |
 | `third_party\src\openssl-3.0.15.zip` | Upstream OpenSSL release archive (Apache-2.0). |
 | `third_party\src\opus-1.3.1.zip` | Upstream Opus release archive (BSD-3-Clause) — `github.com/xiph/opus`. |
 | `third_party\src\bcg729.zip` | `github.com/Lekensteyn/bcg729` (ITU G.729 Annex A/B codec). |
 | `third_party\src\SQLiteCpp-3.4.0.zip` | `github.com/SRombauts/SQLiteCpp` tag **3.4.0** (bundles sqlite3). |
 | `chkstk_ms.lib` | **Generated stub** — the name is an ARM64-only library; it does not exist for x86/x64 in any Windows SDK. See §5. |
 
+Nothing is vendored prebuilt any more: the pjproject archives under
+`third_party\lib\<Platform>\` are produced by the pipeline from the archive
+above, so the application and the library it links against can never drift
+apart.
+
 The archives are tracked with **git-lfs** (see `.gitattributes`), so a clone
 brings them along; `third_party\MANIFEST.txt` records the SHA-256 of each one.
 
-Downloads were made through the `gh-proxy.com` mirror (`github.com` is not
-directly reachable from this network; `codeload.github.com` is).
+Downloads were made from the upstream tag archives:
 
 ```powershell
-curl.exe -sSL -o deps.zip "https://gh-proxy.com/https://github.com/guilhermejansen/MicroSIP-Com-Deps/archive/refs/heads/master.zip"
+curl.exe -sSL -o pjproject-2.17.zip "https://github.com/pjsip/pjproject/archive/refs/tags/2.17.zip"
 curl.exe -sSL -o sqlitecpp.zip "https://codeload.github.com/SRombauts/SQLiteCpp/zip/refs/tags/3.4.0"
 curl.exe -sSL -o bcg729.zip   "https://codeload.github.com/Lekensteyn/bcg729/zip/refs/heads/master"
 ```
+
+The pjproject release page publishes **no binary asset**, so the tag zipball
+*is* the release archive — and it carries the full source tree, libyuv
+included, which is what `libpjproject.vcxproj` builds against.
 
 `build\import-deps.ps1` performs that vendoring step once and records the
 hashes; it is not needed for an ordinary build.
@@ -102,7 +109,7 @@ things the project file consumes:
   ships. Use `v143` (VS2022) or `v145` (VS2026).
 * `$(PlatformVersion)` — the Windows SDK version.
 * the `PJ_WIN32` / `PJ_M_I386` / `PJ_M_X86_64` macros, which must match the
-  configuration the prebuilt pjsip library was compiled with.
+  configuration the pjproject library is compiled with.
 
 ```xml
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
@@ -130,7 +137,7 @@ directories are needed.
 
 All of them must be compiled with the **static debug CRT (`/MTd`)** to match
 `RuntimeLibrary=MultiThreadedDebug` in `microsip.vcxproj` and the
-`LIBCMTD` directive inside the prebuilt pjsip library. See §5.
+`LIBCMTD` directive inside the pjproject library. See §5.
 
 ```bat
 call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat" x86
@@ -156,7 +163,7 @@ third_party\SQLiteCpp\sqlite3.h
 third_party\SQLiteCpp\Win32\Debug\{SQLiteCpp,sqlite3}.lib
 third_party\bcg729\Win32\Debug\bcg729.lib
 third_party\opus\Win32\Debug\opus.lib
-third_party\lib\libpjproject-i386-Win32-vc14-Debug-Static.lib
+third_party\lib\Win32\libpjproject-i386-Win32-vc14-Debug-Static.lib
 ```
 
 For x64 the same layout is used with the platform segment, which the project
@@ -168,8 +175,14 @@ third_party\SQLiteCpp\x64\Release\{SQLiteCpp,sqlite3}.lib
 third_party\bcg729\x64\{Debug,Release}\bcg729.lib
 third_party\opus\x64\{Debug,Release}\opus.lib
 third_party\openssl\x64\{Debug,Release}\lib\{libcrypto,libssl}.lib
-third_party\lib\libpjproject-x86_64-x64-vc14-{Debug,Release}-Static.lib
+third_party\lib\x64\libpjproject-x86_64-x64-vc14-{Debug,Release}-Static.lib
 ```
+
+The pjproject archives live in `third_party\lib\<Platform>\`, **not** in the
+shared `third_party\lib\`: the project file lists `third_party\lib\$(Platform)\`
+first, but the shared folder is searched before the per-library folders
+(§11.3), and an architecture-specific archive there would shadow the other
+platform.
 
 See §10 for how those are produced.
 
@@ -196,9 +209,9 @@ lib /nologo /OUT:chkstk_ms.lib stub.obj
 
 ### CRT mismatch produces misleading `LNK2019`
 
-The prebuilt pjsip library carries `/DEFAULTLIB:LIBCMTD` (static debug CRT)
-and `opus.lib` carries `/DEFAULTLIB:LIBCMT` (static **release** CRT). The
-application itself is built with the static CRT (`RuntimeLibrary`
+The pjproject library carries `/DEFAULTLIB:LIBCMTD` (static debug CRT) in its
+Debug flavour and `opus.lib` carries `/DEFAULTLIB:LIBCMT` (static **release**
+CRT). The application itself is built with the static CRT (`RuntimeLibrary`
 = `MultiThreadedDebug` / `MultiThreaded`), so locally built libraries must use
 `/MTd` too. If they are built with `/MDd`, the link fails with errors that
 point at the wrong thing:
@@ -222,21 +235,22 @@ static one.
    microsip.vcxproj /t:Build /p:Configuration=Debug /p:Platform=Win32 /m /v:m /nologo
 ```
 
-Output: `Debug\microsip.exe` (x86, 15.8 MB, file version 3.23.5).
+Output: `Debug\microsip.exe` (x86, 16.7 MB, file version 3.23.5).
 
-**Out of the box only `Debug|Win32` links**, because the prebuilt pjsip library
-exists solely as `libpjproject-i386-Win32-vc14-Debug-Static.lib`:
+**All four configurations link**, because the pipeline builds the pjproject
+library itself — for `x64` and `Win32`, `Debug` and `Release`:
 
-* `Release|Win32` would select `…-Release-Static.lib`, which is not available;
-* `x64` and `ARM64` have no prebuilt pjsip library at all.
+* `Debug|Win32` → `third_party\lib\Win32\libpjproject-i386-Win32-vc14-Debug-Static.lib`
+* `Release|Win32` → `…-Release-Static.lib`
+* `Debug|x64` → `third_party\lib\x64\libpjproject-x86_64-x64-vc14-Debug-Static.lib`
+* `Release|x64` → `…-Release-Static.lib`
 
-**All of that is fixable by building pjsip yourself** — the dependency is
-**stock upstream pjproject 2.14.1** (see §9) and the VS property sheet comes
-from pjproject itself, so no author-private patch is required. What has to
-match is the compile configuration: `PJ_WIN64=1;PJ_M_X86_64=1` (or
-`PJ_WIN32=1;PJ_M_I386=1`), `/MTd` for Debug / `/MT` for Release, and
-`PJMEDIA_HAS_VIDEO=1`, otherwise the header/lib ABI diverges. §10 documents
-the full x64 route.
+The dependency is **stock upstream pjproject 2.17** (see §9) and the VS
+property sheet comes from pjproject itself, so no author-private patch is
+required. What has to match is the compile configuration:
+`PJ_WIN64=1;PJ_M_X86_64=1` (or `PJ_WIN32=1;PJ_M_I386=1`), `/MTd` for Debug /
+`/MT` for Release, and `PJMEDIA_HAS_VIDEO=1`, otherwise the header/lib ABI
+diverges. §10 documents the full recipe.
 
 ### Prerequisites
 
@@ -250,7 +264,7 @@ the full x64 route.
 ## 7. Verified result
 
 `Debug\microsip.exe` starts, shows its main window (`MainWindowTitle:
-'MicroSIP'`), keeps 11–12 threads alive (pjsip worker/timer threads) and
+'MicroSIP'`), keeps 12–24 threads alive (pjsip worker/timer threads) and
 creates `call_log.db` with the expected schema:
 
 ```
@@ -265,13 +279,12 @@ opus, sqlite3 and MFC are all statically linked in.
 
 ## 8. Licensing note
 
-The prebuilt pjsip static library and `opus.lib` come from a third-party
-repository that mirrors the author's build tree. `bcg729` is **GPL-2.0** (its
-upstream README says "The source code is licensed under GPLv2", and the
-`COPYING` file in the archive is the GPL version 2 text) — distributing a
-binary built from it carries the corresponding obligations. MicroSIP itself is
-GPLv2. Every vendored licence is collected verbatim in
-`third_party\LICENSES\`.
+The pjproject static library and `opus.lib` are compiled here from upstream
+sources. `bcg729` is **GPL-2.0** (its upstream README says "The source code is
+licensed under GPLv2", and the `COPYING` file in the archive is the GPL
+version 2 text) — distributing a binary built from it carries the
+corresponding obligations. MicroSIP itself is GPLv2. Every vendored licence is
+collected verbatim in `third_party\LICENSES\`.
 
 PJSIP itself is **not** closed source: upstream pjproject is GPLv2 (or, at
 Teluu's option, a commercial licence), and MicroSIP is GPLv2, so the GPLv2
@@ -285,18 +298,18 @@ Everything below was checked against upstream sources; nothing is inferred.
 
 | Check | Result |
 |---|---|
-| pjproject headers in `third_party/` vs upstream pjproject **2.14.1** | **305 / 305 byte-identical**, 0 differences (the only other pjproject file there, `pj/config_site.h`, has no upstream counterpart by design) |
-| `third_party/pj/config_site.h` vs upstream `config_site_sample.h` | identical **except one added line**: `#define PJMEDIA_HAS_VIDEO 1` |
-| Objects inside `libpjproject-i386-Win32-vc14-Debug-Static.lib` | 439 distinct modules — 410 map to upstream pjproject sources; the other **29 are libyuv** (upstream's own `third_party/yuv`, whose sources upstream fetches at build time and does not ship in the release zip) |
-| Exported C symbols of that lib | 2266 symbols — **every one** exists in upstream 2.14.1 (20 are internal symbols that live only in upstream `.c` files); **0 author-only APIs** |
+| pjproject headers in `third_party/` vs upstream pjproject **2.17** | **328 / 328 byte-identical**, 0 differing, 0 missing, 0 extra — §1c of the tool rebuilds the flattened tree from the upstream include directories and compares file by file |
+| the two generated `pj\config_site.h` copies | byte-identical to each other: the application and the library are compiled from the same macro set |
+| `third_party/pj/config_site.h` vs upstream `config_site_sample.h` | identical **except the added local block**: `#define PJMEDIA_HAS_VIDEO 1` plus the x64-only Opus/TLS switches |
+| Objects inside `libpjproject-i386-Win32-vc14-Debug-Static.lib` | 458 distinct modules — **every one** maps to an upstream pjproject source file (the 29 libyuv modules included: the release archive ships libyuv as source under `third_party/yuv`) |
+| Exported C symbols of that lib | 2487 `pj*` symbols — **every one** exists in upstream 2.17 (24 are internal symbols that live only in upstream `.c` files); **0 author-only APIs** |
 | `build/vs/` in the author's tree vs upstream pjproject 2.8 | **34 / 34 files byte-identical** (SHA-256) |
 | Author's 2019 tree vs upstream 2.8 / 2.9 | 1239 `.c/.h` files: 1081 identical to 2.8, 115 identical to 2.9 only, 43 matching neither — of those 43, 33 are the MicroSIP app itself, 4 are upstream's sample CLI app (`pjsip-apps`), and **6 are pjproject-core files that are upstream 2.9 plus a 2–4 line local delta** (`config_site.h`, `config.h` version string, `ip_helper_win32.c`, `ssl_sock_imp_common.h`, `ssl_sock_ossl.c`, `sip_resolve.c`) |
 
-**Conclusion:** the prebuilt pjproject library is *stock upstream pjproject
-2.14.1* plus upstream's own libyuv, compiled with the author's Visual Studio
-settings (`vc14`, `i386`, `Debug`, `Static`, `/MTd`) and the `config_site.h`
-above. There is no author-patched pjproject source in the dependency tree and
-no author-only API.
+**Conclusion:** the pjproject dependency is *stock upstream pjproject 2.17*,
+compiled here from the release archive with the `config_site.h` above. There is
+no author-patched pjproject source in the dependency tree and no author-only
+API.
 
 The author's workspace tree (`github.com/pythonist77/microsip`, GPL-2.0) is a
 pjproject checkout of the **2.8 → 2.9 development window** (2019) with
@@ -317,27 +330,40 @@ Two consequences worth knowing:
   architecture, configuration and linkage. `mainDlg.h` now selects the
   library per architecture (`_M_X64` → `libpjproject-x86_64-x64-vc14-*.lib`),
   which is what makes the x64 build in §10 possible.
-* Replacing the prebuilt library with your own build of upstream 2.14.1 is
-  viable. Match the compile configuration (`PJ_WIN32=1;PJ_M_I386=1`, `/MTd`,
-  `PJMEDIA_HAS_VIDEO=1`) or the header/library ABI diverges.
+* The pjproject library is **built here**, for every platform, from the
+  vendored upstream 2.17 archive. Match the compile configuration
+  (`PJ_WIN32=1;PJ_M_I386=1`, `/MTd`, `PJMEDIA_HAS_VIDEO=1`) or the
+  header/library ABI diverges.
 
 ### Reproducing the checks
 
 `tools/verify-pjproject-provenance.ps1` re-runs everything in this section
-from scratch (headers, library modules, exported symbols, author tree):
+from scratch (headers, library modules, exported symbols, author tree). The
+upstream tree it compares against is the one the pipeline unpacks, so the
+check needs nothing but this repository:
 
 ```powershell
 .\tools\verify-pjproject-provenance.ps1 `
-    -UpstreamRoot  C:\src\pjproject-2.14.1 `
-    -UpstreamRoot2 C:\src\pjproject-2.9 `
+    -UpstreamRoot  .\build\work\pjproject-2.17 `
     -HeaderTree    .\third_party `
-    -AuthorTree    C:\src\microsip-master `
-    -Lib           .\third_party\lib\libpjproject-i386-Win32-vc14-Debug-Static.lib
+    -Lib           .\third_party\lib\Win32\libpjproject-i386-Win32-vc14-Debug-Static.lib
 ```
 
-Those four trees are **not** part of this repository — they are the upstream
-checkouts the comparison is made against. Fetch them separately if you want to
-re-run the provenance proof; the ordinary build does not need them.
+```
+=== 1c. Flattened tree vs upstream include directories (strict) ===
+upstream headers (flattened) : 328
+identical to upstream          : 328
+differing                      : 0
+missing in the header tree     : 0
+extra (not upstream)           : 0
+RESULT: the flattened header tree is byte-identical to upstream
+config_site.h application copy == library build copy : True
+```
+
+The author's own tree (`C:\src\microsip-master`) and a second upstream
+checkout are **not** part of this repository — they are the extra trees the
+historical comparison in this section is made against. Fetch them separately
+if you want to re-run that part; the ordinary build does not need them.
 
 Two pitfalls it deliberately avoids:
 
@@ -351,37 +377,29 @@ Two pitfalls it deliberately avoids:
 
 ---
 
-## 10. Building x64 (and the other configurations)
+## 10. Building the pjproject library and every configuration
 
-Because the pjproject dependency is stock upstream (§9), the missing
-configurations can be produced locally. This has been done for x64; `Debug`,
-`Release` and `ARM64` follow the same recipe.
+Because the pjproject dependency is stock upstream (§9), all configurations can
+be produced locally — and are: `x64` and `Win32`, `Debug` and `Release`.
 
 ### 10.1 What was built
 
 | Artefact | How |
 |---|---|
-| `third_party\lib\libpjproject-x86_64-x64-vc14-Debug-Static.lib` | upstream pjproject 2.14.1, `Debug-Static\|x64` |
-| `third_party\lib\libpjproject-x86_64-x64-vc14-Release-Static.lib` | upstream pjproject 2.14.1, `Release-Static\|x64` |
-| `third_party\SQLiteCpp\x64\Debug\{sqlite3,SQLiteCpp}.lib` | SQLiteCpp 3.4.0, `/MTd` |
-| `third_party\SQLiteCpp\x64\Release\{sqlite3,SQLiteCpp}.lib` | SQLiteCpp 3.4.0, `/MT` |
-| `third_party\bcg729\x64\{Debug,Release}\bcg729.lib` | bcg729, `/MTd` / `/MT` |
-| `third_party\opus\x64\{Debug,Release}\opus.lib` | opus 1.3.1, `win32\VS2015\opus.vcxproj` |
+| `third_party\lib\x64\libpjproject-x86_64-x64-vc14-Debug-Static.lib` | upstream pjproject 2.17, `Debug-Static\|x64` |
+| `third_party\lib\x64\libpjproject-x86_64-x64-vc14-Release-Static.lib` | upstream pjproject 2.17, `Release-Static\|x64` |
+| `third_party\lib\Win32\libpjproject-i386-Win32-vc14-Debug-Static.lib` | upstream pjproject 2.17, `Debug-Static\|Win32` |
+| `third_party\lib\Win32\libpjproject-i386-Win32-vc14-Release-Static.lib` | upstream pjproject 2.17, `Release-Static\|Win32` |
+| `third_party\SQLiteCpp\{x64,Win32}\{Debug,Release}\{sqlite3,SQLiteCpp}.lib` | SQLiteCpp 3.4.0, `/MTd` / `/MT` |
+| `third_party\bcg729\{x64,Win32}\{Debug,Release}\bcg729.lib` | bcg729, `/MTd` / `/MT` |
+| `third_party\opus\{x64,Win32}\{Debug,Release}\opus.lib` | opus 1.3.1, `win32\VS2015\opus.vcxproj` |
+| `third_party\openssl\x64\{Debug,Release}\lib\{libcrypto,libssl}.lib` | OpenSSL 3.0.15, x64 only (§11.4) |
 
-**Feature parity check:** before Opus and TLS were switched on (§11), the
-freshly built x64 library exported **exactly the same 2266 `pj*` symbols** as
-the official 32-bit prebuilt library — zero missing, zero extra:
-
-```powershell
-.\tools\compare-lib-symbols.ps1 `
-    -LibA .\third_party\lib\libpjproject-i386-Win32-vc14-Debug-Static.lib `
-    -LibB .\third_party\lib\libpjproject-x86_64-x64-vc14-Debug-Static.lib
-```
-
-Both libraries carry SRTP, the H.264 and VPX packetizers, and — like the
-official one — **no Opus codec and no OpenSSL/TLS backend**, because
-`PJMEDIA_HAS_OPUS_CODEC` and `PJ_HAS_SSL_SOCK` both default to 0. Enabling
-Opus and TLS is a deliberate extra (§11), not a parity gap.
+**Feature parity:** the x64 library has Opus and TLS switched on (§11), the
+Win32 library has neither — `PJMEDIA_HAS_OPUS_CODEC` and `PJ_HAS_SSL_SOCK`
+are 0 for Win32, because OpenSSL is only built for x64. The application sees
+the same macro set for the platform it is compiled for, so header and library
+always agree.
 
 ### 10.2 Recipe
 
@@ -389,12 +407,12 @@ The whole thing is one command (see §12):
 
 ```powershell
 # everything: toolchain check, dependencies, third-party libraries,
-# the x64 pjproject library and the application
+# the pjproject libraries and the application
 .\build\build.ps1
 
-# or just the x64 half
+# or one platform / configuration
 .\build\build.ps1 -Platform x64 -Configuration Debug
-.\build\build.ps1 -Platform x64 -Configuration Release
+.\build\build.ps1 -Platform Win32 -Configuration Release
 ```
 
 The individual stages can also be run on their own — each one is idempotent
@@ -417,13 +435,14 @@ and skips what it has already produced:
   cannot reach it.
 * **Library naming.** pjproject's own props derive the name from both the
   target CPU and the platform: `libpjproject-x86_64-x64-vc14-…lib` for x64
-  (not `…-Win32-…` like the 32-bit one). `mainDlg.h` must select it
-  accordingly, otherwise the linker looks for the 32-bit name.
-* **32-bit archives must not sit in `lib\`.** `lib\` is on the library path of
-  *every* platform. `opus.lib` and `bcg729.lib` were moved to
-  `third_party\opus\Win32\` and `third_party\bcg729\Win32\`, which the
-  project file already lists as `..\third_party\opus\$(Platform)\` and
-  `..\third_party\bcg729\$(Platform)\`.
+  and `libpjproject-i386-Win32-vc14-…lib` for Win32. `mainDlg.h` must select
+  it accordingly, otherwise the linker looks for the wrong name.
+* **Architecture-specific archives must not sit in the shared `lib\`.** `lib\`
+  is on the library path of *every* platform and is searched *before* the
+  per-platform folders (§11.3). `opus.lib` and `bcg729.lib` live in
+  `third_party\opus\$(Platform)\$(Configuration)\` and
+  `third_party\bcg729\$(Platform)\$(Configuration)\`; the pjproject archives
+  live in `third_party\lib\<Platform>\`.
 * **CRT consistency.** Debug uses `/MTd` everywhere, Release uses `/MT`.
   Mixing them produces the misleading `LNK4098` + `LNK2019` pair described in
   §5. This bites much harder once Opus or OpenSSL is switched on, because
@@ -433,9 +452,10 @@ and skips what it has already produced:
 
 | Configuration | Output | Size | Runs |
 |---|---|---|---|
-| `Debug\|x64` | `x64\Debug\microsip.exe` | 20.8 MB | window `MicroSIP`, 12 threads, `call_log.db` created |
-| `Release\|x64` | `x64\Release\microsip.exe` | 6.8 MB | window `MicroSIP`, 24 threads, `call_log.db` created |
-| `Debug\|Win32` (regression) | `Debug\microsip.exe` | 16.5 MB | window, 12 threads, `call_log.db` created |
+| `Debug\|x64` | `x64\Debug\microsip.exe` | 26,542,080 bytes | window `MicroSIP`, 24 threads, `call_log.db` created |
+| `Release\|x64` | `x64\Release\microsip.exe` | 10,373,120 bytes | window `MicroSIP`, 12 threads, `call_log.db` created |
+| `Debug\|Win32` | `Debug\microsip.exe` | 16,681,984 bytes | window `MicroSIP`, 24 threads, `call_log.db` created |
+| `Release\|Win32` | `Release\microsip.exe` | 5,838,848 bytes | window `MicroSIP`, 24 threads, `call_log.db` created |
 
 `tools\verify-app.ps1` performs that smoke test (architecture check, window
 title, thread count, database creation).
@@ -468,7 +488,7 @@ decide what is compiled *into* the library **and** what the application
 believes the library contains. The pipeline therefore writes the identical
 file into
 
-* `pjproject-2.14.1\pjlib\include\pj\config_site.h` (library build)
+* `pjproject-2.17\pjlib\include\pj\config_site.h` (library build)
 * `third_party\pj\config_site.h` (application build)
 
 The macros are guarded by `#if defined(_M_X64)`:
@@ -483,9 +503,9 @@ The macros are guarded by `#if defined(_M_X64)`:
 #endif
 ```
 
-The locally built x64 library has both features; the 32-bit library that ships
-with MicroSIP was compiled without them. The Win32 build of the application
-links that 32-bit library, so it has to see the same macro set — otherwise the
+The x64 library has both features; the Win32 library is compiled without them,
+because OpenSSL is only built for x64. The Win32 build of the application
+links that Win32 library, so it has to see the same macro set — otherwise the
 headers promise features the binary does not have.
 
 ### 11.2 Third-party archives are per (platform, configuration)
@@ -587,9 +607,10 @@ Three details are worth recording:
 
 | Configuration | Output | Size | Runs |
 |---|---|---|---|
-| `Debug\|x64` | `x64\Debug\microsip.exe` | 26.1 MB | window `MicroSIP`, 24 threads, `call_log.db` created |
-| `Release\|x64` | `x64\Release\microsip.exe` | 10.1 MB | window `MicroSIP`, 12 threads, `call_log.db` created |
-| `Debug\|Win32` (regression) | `Debug\microsip.exe` | 16.5 MB | builds and runs, Opus/TLS off as intended |
+| `Debug\|x64` | `x64\Debug\microsip.exe` | 26,542,080 bytes | window `MicroSIP`, 24 threads, `call_log.db` created |
+| `Release\|x64` | `x64\Release\microsip.exe` | 10,373,120 bytes | window `MicroSIP`, 12 threads, `call_log.db` created |
+| `Debug\|Win32` | `Debug\microsip.exe` | 16,681,984 bytes | builds and runs, Opus/TLS off as intended |
+| `Release\|Win32` | `Release\microsip.exe` | 5,838,848 bytes | builds and runs, Opus/TLS off as intended |
 
 ---
 
@@ -609,11 +630,10 @@ cd MicroSIP-3.23.5-src
 
 | Path | Tracked | Notes |
 |---|---|---|
-| `third_party\pj\`, `third_party\pjsip\`, … | yes (text) | pjproject 2.14.1 headers, flattened, byte-identical to upstream (§9) |
-| `third_party\lib\libpjproject-i386-…-Static.lib` | yes (**git-lfs**) | the prebuilt 32-bit library the Win32 build links |
-| `third_party\src\*.zip` | yes (**git-lfs**) | the source archives everything else is built from |
+| `third_party\pj\`, `third_party\pjsip\`, … | yes (text) | pjproject 2.17 headers, flattened, byte-identical to upstream (§9) |
+| `third_party\src\*.zip`, `*.7z` | yes (**git-lfs**) | the source archives everything else is built from |
 | `build\` | yes (text) | the pipeline, the `chkstk_ms` stub, the upstream VS property sheets |
-| `third_party\opus\`, `bcg729\`, `SQLiteCpp\`, `openssl\` | no | generated by the pipeline |
+| `third_party\lib\`, `opus\`, `bcg729\`, `SQLiteCpp\`, `openssl\` | no | generated by the pipeline |
 | `build\work\` | no | unpacked sources and intermediate objects |
 
 `third_party\MANIFEST.txt` records the SHA-256 of every vendored archive. Every
@@ -626,20 +646,20 @@ directly after a clone:
 
 ```
    [ok]   src/bcg729.zip  (221,819 bytes)
+   [ok]   src/MicroSIP-3.23.5-src.7z  (438,999 bytes)
    [ok]   src/openssl-3.0.15.zip  (18,271,384 bytes)
    [ok]   src/opus-1.3.1.zip  (4,806,880 bytes)
-   [ok]   src/pjproject-2.14.1.zip  (12,433,561 bytes)
+   [ok]   src/pjproject-2.17.zip  (13,221,124 bytes)
    [ok]   src/SQLiteCpp-3.4.0.zip  (2,911,290 bytes)
-   [ok]   lib/libpjproject-i386-Win32-vc14-Debug-Static.lib  (15,959,216 bytes)
 
 RESULT: all 6 vendored archives match the manifest.
 ```
 
 The archives live in the local git-lfs object store
-(`.git\lfs\objects`, 52 MB for the six of them). This repository has **no
-remote configured** — when one is added, `git push` uploads the lfs objects
-through the pre-push hook, and a clone on the other side gets the real files
-instead of the pointer stubs.
+(`.git\lfs\objects`, about 38 MB for the six of them). The repository has two
+remotes — `gitee` (primary) and `origin` (backup); `git push` uploads the lfs
+objects through the pre-push hook, and a clone on the other side gets the
+real files instead of the pointer stubs.
 
 ### 12.2 The pipeline
 
@@ -648,7 +668,7 @@ instead of the pointer stubs.
 | 0 | `build\steps\00-check-toolchain.ps1` | reports every missing tool and the command that installs it |
 | 1 | `build\steps\01-prepare.ps1` | unpacks `third_party\src\*.zip`, stages the third-party headers, generates `pj\config_site.h` |
 | 2 | `build\steps\02-thirdparty.ps1` | builds SQLiteCpp, bcg729, opus, the `chkstk_ms` placeholder and (for x64) OpenSSL — per platform **and** configuration |
-| 3 | `build\steps\03-pjproject.ps1` | patches and builds the pjproject static library for x64 |
+| 3 | `build\steps\03-pjproject.ps1` | patches and builds the pjproject static library for every platform, installs it into `third_party\lib\<Platform>\` |
 | 4 | `build\steps\04-app.ps1` | builds `microsip.vcxproj` |
 
 ### 12.3 What had to change in the project file
@@ -667,7 +687,7 @@ headers are flattened into `third_party\`, which is on the include path.
 
 The Visual Studio property sheet that the project imports
 (`..\build\vs\pjproject-vs14-common-config.props`) is vendored in `build\vs\`
-instead — **byte-identical to upstream pjproject 2.14.1**, so the provenance
+instead — **byte-identical to upstream pjproject**, so the provenance
 argument of §9 is unaffected. It needs its sibling
 `pjproject-vs14-api-def.props`, which is vendored next to it.
 
@@ -694,13 +714,13 @@ toolset names are different series: the toolset lives in
   archives** — it is searched before the per-platform folders (§11.3).
 * **Every archive is built per configuration** so that its CRT matches
   (§11.3).
-* **OpenSSL is built for x64 only.** The Win32 application links the vendored
-  32-bit pjproject library, which was compiled *without* a TLS backend — it
-  exports neither `pj_ssl_sock_start_connect` nor any `SSL_*` / `EVP_*` symbol
-  (only the pjsip TLS API layer `pj_ssl_sock_param_copy` and friends). Nothing
-  in the Win32 link therefore references OpenSSL, and building it would cost
-  ~20 minutes for archives nobody links. `build\steps\02-thirdparty.ps1` skips
-  it and says so; `-BuildSslWin32` forces it.
+* **OpenSSL is built for x64 only.** The Win32 pjproject is compiled *without* a
+  TLS backend — it exports neither `pj_ssl_sock_start_connect` nor any
+  `SSL_*` / `EVP_*` symbol (only the pjsip TLS API layer
+  `pj_ssl_sock_param_copy` and friends). Nothing in the Win32 link therefore
+  references OpenSSL, and building it would cost ~20 minutes for archives
+  nobody links. `build\steps\02-thirdparty.ps1` skips it and says so;
+  `-BuildSslWin32` forces it.
 * **OpenSSL's 32-bit target is `VC-WIN32`, not `VC-WIN32A`.** `Configure`
   rejects the latter and prints its whole target table, which is easy to
   mistake for a broken compiler:
@@ -709,10 +729,9 @@ toolset names are different series: the toolset lives in
   Usage: Configure [no-<cipher> ...] ...
   pick os/compiler from: BC-32 BS2000-OSD … VC-WIN32 VC-WIN64A …
   ```
-* **`Release|Win32` is skipped, not attempted.** Only the Debug flavour of the
-  32-bit pjproject library is vendored, so the Release link would look for
-  `libpjproject-i386-Win32-vc14-Release-Static.lib` and fail. Step 4 detects
-  the missing archive and skips that configuration with an explanation.
+* **No configuration is skipped.** All four combinations link, because the
+  pjproject library is built for `x64` and `Win32` in `Debug` and `Release`.
+  Step 4 no longer has to detect a missing archive.
 
 ---
 
@@ -743,9 +762,7 @@ upstream's copy.
 ### 13.2 The pjproject constant rename
 
 Upstream MicroSIP 3.23.x ships **pjproject 2.17** (the 3.23.4 changelog says
-"updated PJSIP to version 2.17"). This repository keeps **2.14.1**, because the
-only prebuilt 32-bit library that ships with MicroSIP is a 2.14.1 build and
-rebuilding pjproject for Win32 is out of scope (§6, §9).
+"updated PJSIP to version 2.17").
 
 The single API difference the 3.23.5 sources depend on is the name of a
 compile-time constant. pjproject 2.15 renamed
@@ -756,13 +773,14 @@ PJMEDIA_AUD_MAX_DEVS      ->      PJMEDIA_AUD_DEV_MAX_DEVS
 
 Both default to 64. `mainDlg.cpp`, `SettingsDlg.cpp` and `microsip.cpp` size
 their `pjmedia_aud_dev_info` arrays with the new name, so the 2.14.1 headers
-do not compile them:
+this repository used to vendor did not compile them:
 
 ```
 mainDlg.cpp(3808,22): error C2065: "PJMEDIA_AUD_DEV_MAX_DEVS": 未声明的标识符
 ```
 
-`build\steps\01-prepare.ps1` therefore adds to the generated `pj\config_site.h`:
+While the repository stayed on 2.14.1, `build\steps\01-prepare.ps1` bridged
+the gap in the generated `pj\config_site.h`:
 
 ```c
 #ifndef PJMEDIA_AUD_DEV_MAX_DEVS
@@ -774,12 +792,11 @@ mainDlg.cpp(3808,22): error C2065: "PJMEDIA_AUD_DEV_MAX_DEVS": 未声明的标�
 #endif
 ```
 
-`config_site.h` is pjproject's own configuration hook and is included by
-`pj\config.h` before anything else, so the macro is visible everywhere the
-application uses it. The `#ifndef` guard makes the block a no-op once the
-headers define the new name themselves, so the file stays correct if the
-vendored pjproject is ever upgraded. pjproject 2.14.1 never uses the new name
-itself, so the compiled library is unaffected.
+**That shim is gone now.** pjproject 2.17 defines the new name natively in
+`pjmedia-audiodev/config.h`, and `config_site.h` is included *before* that
+header — so an alias left in place would point at `PJMEDIA_AUD_MAX_DEVS`,
+which no longer exists, and the build would fail. §14 describes the upgrade
+that made the shim unnecessary.
 
 ### 13.3 `mainDlg.h` carries a local patch
 
@@ -804,7 +821,7 @@ fatal error LNK1120: 145 个无法解析的外部命令
 ```
 
 The unresolved symbols (`pjsua_*`, `acquire_call`, …) all exist in pjproject
-2.14.1 — the 32-bit archive was simply skipped because of the architecture
+2.17 — the 32-bit archive was simply skipped because of the architecture
 mismatch. The block has to be re-applied after every upstream update.
 
 ### 13.4 The UTF-8 BOM
@@ -825,11 +842,131 @@ file in the tree that is not byte-identical to the 3.23.5 release archive.
 
 | Configuration | Binary | File version |
 |---|---|---|
-| `x64\|Debug` | `x64\Debug\microsip.exe` (26,264,576 bytes) | 3.23.5 |
-| `x64\|Release` | `x64\Release\microsip.exe` (10,138,112 bytes) | 3.23.5 |
+| `x64\|Debug` | `x64\Debug\microsip.exe` (26,542,080 bytes) | 3.23.5 |
+| `x64\|Release` | `x64\Release\microsip.exe` (10,373,120 bytes) | 3.23.5 |
+| `Win32\|Debug` | `Debug\microsip.exe` (16,681,984 bytes) | 3.23.5 |
+| `Win32\|Release` | `Release\microsip.exe` (5,838,848 bytes) | 3.23.5 |
 
 Verified with `tools\verify-app.ps1` (window, threads, `call_log.db`) and
 `tools\verify-tls.ps1` (a real SIP-over-TLS transport) for both
 configurations.
 
+---
 
+## 14. Upgrading the vendored pjproject to 2.17
+
+Upstream MicroSIP 3.23.x ships **pjproject 2.17** (the 3.23.4 changelog says
+"updated PJSIP to version 2.17"). This repository used to vendor **2.14.1**
+with a compile-time shim for one renamed constant (§13.2), because the only
+32-bit pjproject library that shipped with MicroSIP was a 2.14.1 build and
+rebuilding pjproject for Win32 was out of scope.
+
+The shim was the symptom of the real problem: **a prebuilt 2.14.1 library
+cannot be linked against 2.17 headers.** The upgrade therefore had to include
+building pjproject for Win32 as well — which removes the vendored library
+entirely.
+
+### 14.1 What changed in the tree
+
+| | Before | After |
+|---|---|---|
+| Source archive | `src\pjproject-2.14.1.zip` (12,433,561 B) | `src\pjproject-2.17.zip` (13,221,124 B, SHA-256 `c7f57dae…`) |
+| Flattened headers | 310 files | **328 files** (105 changed, 18 new, 0 removed) |
+| 32-bit library | `lib\libpjproject-i386-Win32-vc14-Debug-Static.lib` (15,959,216 B, vendored via git-lfs) | **deleted** — built locally now |
+| `pj\config_site.h` | carried the `PJMEDIA_AUD_DEV_MAX_DEVS` alias | alias removed (2.17 defines the name natively) |
+| `Release\|Win32` | skipped with a message | builds and runs |
+
+The 18 new headers are the ones 2.15–2.17 added: `pj\argparse.h`,
+`pj\atomic_queue.h`, `pj\atomic_slist.h`, `pj\unittest.h`,
+`pjlib-util\websock.h`, `pjmedia\ai_port.h`, `pjmedia\av_sync.h`,
+`pjmedia\txt_stream.h`, `pjmedia-codec\lyra.h`, `pjmedia-audiodev\alsa.h`,
+`pjsip-simple\dialog_info.h`, `pjsip-simple\dlg_event.h`,
+`pjsip-ua\sip_siprec.h` and the four `*.h.cm` autoconf templates.
+
+### 14.2 The flattening rule
+
+`third_party\` holds one flat include tree. It is the union of the five
+upstream include directories:
+
+```
+third_party  =  pjlib/include
+              ∪  pjlib-util/include
+              ∪  pjmedia/include
+              ∪  pjnath/include
+              ∪  pjsip/include
+```
+
+e.g. `pjsip/include/pjsua-lib/pjsua.h` → `third_party\pjsua-lib\pjsua.h`, and
+`pjlib/include/pjlib.h` → `third_party\pjlib.h`.
+
+This rule was verified against the 2.14.1 tree (311 files, 0 differences in
+either direction) before it was applied to 2.17, and it is now a **checked
+invariant**: `tools\verify-pjproject-provenance.ps1` §1c rebuilds the
+flattened tree from the upstream include directories and compares file by
+file. `build\import-deps.ps1` derives the vendored tree the same way, so the
+headers can be re-created from the archive at any time.
+
+### 14.3 The pipeline changes
+
+* `build\steps\01-prepare.ps1` unpacks `pjproject-2.17.zip` into
+  `build\work\pjproject-2.17` and no longer writes the constant alias.
+* `build\steps\03-pjproject.ps1` builds **every** platform
+  (`x64` + `Win32`, `Debug-Static` + `Release-Static`) and installs the
+  archives into `third_party\lib\<Platform>\` — per platform, because the
+  shared `third_party\lib\` is searched *before* the per-platform folders
+  (§11.3).
+* The opus pragma patch is no longer needed: pjproject 2.15 replaced the
+  hardcoded `#pragma comment(lib, "libopus.a")` with
+  `#pragma comment(lib, PJMEDIA_CODEC_OPUS_LIB_NAME)`, and that macro
+  defaults to `"opus.lib"` — the name MSVC actually produces. The step now
+  *checks* for both spellings and fails loudly if it finds neither.
+* `build\steps\04-app.ps1` no longer skips `Release|Win32`, and
+  `build\build.ps1` passes the requested platform to step 3 instead of
+  hardcoding `x64`.
+* `build\import-deps.ps1` derives the flattened headers from the pjproject
+  archive instead of copying them from a separate dependency repository, and
+  no longer vendors a prebuilt library.
+* `.gitignore` no longer has to except the vendored 32-bit archive — nothing
+  under `third_party\lib\` is tracked any more.
+
+### 14.4 Upstream changes that matter here
+
+| Upstream | Impact |
+|---|---|
+| MSVC default Opus library name → `opus.lib` (was `libopus.a`) | removes the local pragma patch (§14.3) |
+| `pjsua2::Call::acc` changed from `Account&` to `Account*` | **none** — MicroSIP uses the PJSUA1 C API; only `tools\tls-selftest` includes `pjsua2.hpp`, and it does not touch `Call` |
+| INVITE transaction termination timing | behaviour only, no API change |
+
+### 14.5 Result
+
+| Configuration | Binary | Size | Verification |
+|---|---|---|---|
+| `x64\|Debug` | `x64\Debug\microsip.exe` | 26,542,080 B | `verify-app`: window `MicroSIP`, 24 threads, `call_log.db` created |
+| `x64\|Release` | `x64\Release\microsip.exe` | 10,373,120 B | `verify-app` + `verify-tls` (real TLS transport on :5061) |
+| `Win32\|Debug` | `Debug\microsip.exe` | 16,681,984 B | `verify-app`: window `MicroSIP`, 24 threads, `call_log.db` created |
+| `Win32\|Release` | `Release\microsip.exe` | 5,838,848 B | `verify-app`: window `MicroSIP`, 24 threads, `call_log.db` created |
+
+Provenance re-verified after the upgrade:
+
+```
+=== 1c. Flattened tree vs upstream include directories (strict) ===
+upstream headers (flattened) : 328
+identical to upstream          : 328
+differing                      : 0
+missing in the header tree     : 0
+extra (not upstream)           : 0
+RESULT: the flattened header tree is byte-identical to upstream
+config_site.h application copy == library build copy : True
+```
+
+```
+distinct modules : 458
+modules with NO same-named upstream .c : 0
+exported pj* C symbols : 2487
+NOT found anywhere in upstream : 0  <-- these would be author-only APIs
+```
+
+**The invariant to remember:** the application headers and the pjproject
+library always come from the same release. The header tree is derived from
+the vendored archive, and the library is compiled from that same archive —
+there is no prebuilt artefact left that could disagree with them.

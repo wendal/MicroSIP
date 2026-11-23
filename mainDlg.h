@@ -26,8 +26,9 @@
 
 // The pjproject static library is bound by name, and upstream hardcodes the
 // 32-bit artefact. Make the selection architecture aware so the x64 build
-// links libpjproject-x86_64-x64-vc14-*.lib instead. The library is built
-// from stock upstream pjproject 2.14.1 - see BUILD.md section 9.
+// links libpjproject-x86_64-x64-vc14-*.lib instead. Both artefacts are built
+// from stock upstream pjproject 2.17 by build\steps\03-pjproject.ps1 and
+// installed into third_party\lib\<Platform>\ - see BUILD.md section 9.
 #if defined(_M_X64)
   #ifdef NDEBUG
     #pragma comment(lib, "libpjproject-x86_64-x64-vc14-Release-Static.lib")
@@ -47,10 +48,10 @@
 // explicit and guarantees the archive is on the link line. Two things matter
 // here:
 //   * opus.lib must be the one for THIS platform and configuration. The
-//     MicroSIP source release ships an x86 copy in third_party\lib, which is
-//     searched before third_party\opus\$(Platform)\$(Configuration)\ - that
-//     x86 archive wins and the x64 references stay unresolved. See BUILD.md
-//     section 11.3.
+//     shared third_party\lib\ is searched before
+//     third_party\opus\$(Platform)\$(Configuration)\, so an architecture
+//     specific archive that ends up there wins and the other platform's
+//     references stay unresolved. See BUILD.md section 11.3.
 //   * its CRT has to match the configuration (Debug /MTd, Release /MT),
 //     otherwise LNK4098 reports a default library conflict.
 #pragma comment(lib, "opus.lib")

@@ -3,17 +3,19 @@
     Step 3 - build the pjproject static library for x64.
 
 .DESCRIPTION
-    Builds upstream pjproject 2.14.1 (the archive in third_party\src) as
-    "Debug-Static|x64" and "Release-Static|x64" and installs the result into
-    third_party\lib\.
+    Builds upstream pjproject 2.17 (the archive in third_party\src) as
+    "Debug-Static" and "Release-Static" for every requested platform and
+    installs the result into third_party\lib\<Platform>\.
 
     Two upstream quirks have to be handled:
 
-    1. pjmedia-codec/opus.c carries a GNU style pragma
-           #pragma comment(lib, "libopus.a")
-       It is baked into the object file and travels with the static library,
-       so every consumer ends up asking the MSVC linker for "libopus.a".
-       Upstream only ever built opus with MinGW, where that name is correct.
+    1. pjmedia-codec/opus.c asks the MSVC linker for the Opus archive with a
+           #pragma comment(lib, ...)
+       which is baked into the object file and travels with the static
+       library, so every consumer repeats the request. Upstream used to
+       hardcode the GNU name "libopus.a" there; since 2.15 the name comes
+       from PJMEDIA_CODEC_OPUS_LIB_NAME, which defaults to "opus.lib" - the
+       name MSVC actually produces.
 
     2. The OpenSSL headers are needed by more than pjlib: pjsip_core needs
        openssl/sha.h (HTTP digest authentication) and pjmedia needs
@@ -28,7 +30,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('x64', 'Win32')][string]$Platform = 'x64',
+    [ValidateSet('x64', 'Win32', 'All')][string]$Platform = 'All',
     [string]$RepoRoot = '',
     [switch]$Rebuild
 )
@@ -38,7 +40,7 @@ param(
 if (-not $RepoRoot) { $RepoRoot = Get-RepoRoot }
 $work = Get-WorkDir $RepoRoot
 $tp = Join-Path $RepoRoot 'third_party'
-$tree = Join-Path $work 'pjproject-2.14.1'
+$tree = Join-Path $work 'pjproject-2.17'
 
 if (-not (Test-Path (Join-Path $tree 'pjsip-apps\build\libpjproject.vcxproj'))) {
     throw "pjproject source not found in $tree - run 01-prepare.ps1 first"
@@ -50,11 +52,16 @@ Write-Step "patching pjproject tree"
 $opusC = Join-Path $tree 'pjmedia\src\pjmedia-codec\opus.c'
 $text = Get-Content $opusC -Raw
 if ($text -match 'pragma comment\(lib,\s*"libopus\.a"\)') {
+    # pjproject up to 2.14 hardcoded the GNU name here
     $text = $text -replace 'pragma comment\(lib,\s*"libopus\.a"\)', 'pragma comment(lib, "opus.lib")'
     Set-Content -Path $opusC -Value $text -Encoding utf8 -NoNewline
     Write-Ok 'opus.c            : libopus.a -> opus.lib'
+} elseif ($text -match 'pragma comment\(lib,\s*PJMEDIA_CODEC_OPUS_LIB_NAME\)') {
+    # pjproject since 2.15 asks for PJMEDIA_CODEC_OPUS_LIB_NAME, which
+    # defaults to "opus.lib" - exactly the name MSVC produces.
+    Write-Ok 'opus.c            : pragma already correct (PJMEDIA_CODEC_OPUS_LIB_NAME)'
 } else {
-    Write-Ok 'opus.c            : pragma already correct'
+    throw "unexpected opus pragma in $opusC"
 }
 
 # --- local props ---------------------------------------------------------
@@ -110,19 +117,29 @@ $proj = Join-Path $tree 'pjsip-apps\build\libpjproject.vcxproj'
 $toolset = Get-PlatformToolset
 $target = if ($Rebuild) { 'Rebuild' } else { 'Build' }
 
-foreach ($cfg in @('Debug-Static', 'Release-Static')) {
-    Write-Host "   $cfg ..."
-    Invoke-MsBuild $proj @("/t:$target", "/p:Configuration=$cfg", "/p:Platform=$Platform",
-        "/p:BuildToolset=$toolset", '/m', '/v:m', '/nologo') "pjproject $cfg" | Out-Null
+$plats = if ($Platform -eq 'All') { @('x64', 'Win32') } else { @($Platform) }
+
+foreach ($plat in $plats) {
+    foreach ($cfg in @('Debug-Static', 'Release-Static')) {
+        Write-Host "   $plat | $cfg ..."
+        Invoke-MsBuild $proj @("/t:$target", "/p:Configuration=$cfg", "/p:Platform=$plat",
+            "/p:BuildToolset=$toolset", '/m', '/v:m', '/nologo') "pjproject $plat $cfg" | Out-Null
+    }
 }
 
 # --- install -------------------------------------------------------------
 Write-Step 'installing pjproject libraries'
-$dest = Join-Path $tp 'lib'
-New-Item -ItemType Directory -Force -Path $dest | Out-Null
-foreach ($f in Get-ChildItem (Join-Path $tree 'lib') -Filter "libpjproject-*-$Platform-vc14-*.lib") {
-    Copy-Item $f.FullName (Join-Path $dest $f.Name) -Force
-    Write-Ok ("third_party\lib\{0}  ({1:N0} bytes)" -f $f.Name, $f.Length)
+# Per platform on purpose: third_party\lib\<Platform>\ is the first entry of
+# the application's AdditionalLibraryDirectories, while the *shared*
+# third_party\lib\ is searched before the per-library platform folders. An
+# architecture specific archive must never end up in the shared folder.
+foreach ($plat in $plats) {
+    $dest = Join-Path $tp "lib\$plat"
+    New-Item -ItemType Directory -Force -Path $dest | Out-Null
+    foreach ($f in Get-ChildItem (Join-Path $tree 'lib') -Filter "libpjproject-*-$plat-vc14-*.lib") {
+        Copy-Item $f.FullName (Join-Path $dest $f.Name) -Force
+        Write-Ok ("third_party\lib\{0}\{1}  ({2:N0} bytes)" -f $plat, $f.Name, $f.Length)
+    }
 }
 
 Write-Host ''

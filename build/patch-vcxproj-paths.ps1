@@ -17,8 +17,8 @@
     per-architecture Windows SDK path intact.
 
     Library search path after the migration (order matters, see BUILD.md 11.3):
-        third_party\lib\$(Platform)\            chkstk_ms stub, generated
-        third_party\lib\                        prebuilt 32-bit pjproject
+        third_party\lib\$(Platform)\            chkstk_ms stub + pjproject, generated
+        third_party\lib\                        shared, must stay empty of archives
         third_party\openssl\$(Platform)\$(Configuration)\lib\
         third_party\opus\$(Platform)\$(Configuration)\
         third_party\bcg729\$(Platform)\$(Configuration)\

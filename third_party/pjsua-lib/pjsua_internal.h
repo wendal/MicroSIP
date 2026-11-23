@@ -68,6 +68,11 @@ struct pjsua_call_media
             pjmedia_vid_dev_index rdr_dev;  /**< The video-in render device */
         } v;
 
+        /** Text stream */
+        struct {
+            pjmedia_txt_stream  *stream;    /**< The text stream.           */
+        } t;
+
     } strm;
 
     pj_uint32_t          ssrc;      /**< RTP SSRC                           */
@@ -117,6 +122,11 @@ struct pjsua_call_media
  * Maximum number of SDP "m=" lines to be supported.
  */
 #define PJSUA_MAX_CALL_MEDIA            PJMEDIA_MAX_SDP_MEDIA
+
+ /**
+  * Maximum number of streams from an avi player.
+  */
+#define PJSUA_MAX_AVI_NUM_STREAMS       PJMEDIA_AVI_MAX_NUM_STREAMS
 
 /* Call answer's list. */
 typedef struct call_answer
@@ -213,6 +223,8 @@ struct pjsua_call
                                             offer.                          */
     unsigned             rem_vid_cnt;  /**< No of active video in last remote
                                             offer.                          */
+    unsigned             rem_txt_cnt;  /**< No of active text in last remote
+                                            offer.                          */
     
     pj_bool_t            rx_reinv_async;/**< on_call_rx_reinvite() async.   */
     pj_timer_entry       reinv_timer;  /**< Reinvite retry timer.           */
@@ -241,6 +253,9 @@ struct pjsua_call
     unsigned             hangup_code;   /**< Hangup code.                   */
     pj_str_t             hangup_reason; /**< Hangup reason.                 */
     pjsua_msg_data      *hangup_msg_data;/**< Hangup message data.          */
+    pj_str_t             siprec_metadata;/** siprec metadata in body        */
+
+    pjmedia_av_sync     *av_sync;       /**< Media stream synchronizer      */
 };
 
 
@@ -333,6 +348,8 @@ typedef struct pjsua_acc
     pjsip_transport_type_e tp_type; /**< Transport type (for local acc or
                                          transport binding)             */
     pjsua_ip_change_op ip_change_op;/**< IP change process progress.    */
+    pjsip_auth_clt_sess shared_auth_sess; /**< Share one auth session over
+                                               all requests             */
 } pjsua_acc;
 
 
@@ -368,6 +385,7 @@ typedef struct pjsua_buddy
 {
     pj_pool_t           *pool;      /**< Pool for this buddy.           */
     unsigned             index;     /**< Buddy index.                   */
+    pjsua_acc_id         acc_id;    /**< Account index.                 */
     void                *user_data; /**< Application data.              */
     pj_str_t             uri;       /**< Buddy URI.                     */
     pj_str_t             contact;   /**< Contact learned from subscrp.  */
@@ -377,10 +395,12 @@ typedef struct pjsua_buddy
     unsigned             port;      /**< Buddy port.                    */
     pj_bool_t            monitor;   /**< Should we monitor?             */
     pjsip_dialog        *dlg;       /**< The underlying dialog.         */
-    pjsip_evsub         *sub;       /**< Buddy presence subscription    */
+    pjsip_evsub         *sub;       /**< Buddy subscription             */
+    pj_bool_t            presence;  /**< Presence subscription?         */
     unsigned             term_code; /**< Subscription termination code  */
     pj_str_t             term_reason;/**< Subscription termination reason */
     pjsip_pres_status    status;    /**< Buddy presence status.         */
+    pjsip_dlg_event_status dlg_ev_status;/**< Buddy dialog event status */
     pj_timer_entry       timer;     /**< Resubscription timer           */
 } pjsua_buddy;
 
@@ -396,6 +416,37 @@ typedef struct pjsua_file_data
     unsigned         slot;
 } pjsua_file_data;
 
+/**
+ * AVI player data.
+ */
+typedef struct pjsua_avi_player_data
+{
+    pj_pool_t                 *pool;
+    pjmedia_avi_streams       *avi_streams;
+    unsigned                   vid_cnt;
+    unsigned                   aud_cnt;
+    pjmedia_vid_dev_index      vid_dev_id;
+    pjsua_conf_port_id         slot[PJSUA_MAX_AVI_NUM_STREAMS];
+    pjmedia_port              *port[PJSUA_MAX_AVI_NUM_STREAMS];
+    pjmedia_type               type[PJSUA_MAX_AVI_NUM_STREAMS];
+
+} pjsua_avi_player_data;
+
+/**
+ * AVI recorder data.
+ */
+typedef struct pjsua_avi_recorder_data
+{
+    pj_pool_t               *pool;
+    pjmedia_avi_streams     *avi_streams;
+    pjsua_conf_port_id       aud_slot;
+    pjsua_conf_port_id       vid_slot;
+    pjmedia_port            *aud_port;
+    pjmedia_port            *vid_port;
+    void                    (*cb)(pjsua_avi_rec_id id,
+                                  void *user_data);
+    void                    *user_data;
+} pjsua_avi_recorder_data;
 
 /**
  * Additional parameters for conference bridge.
@@ -530,7 +581,7 @@ struct pjsua_data
     /* Calls: */
     pjsua_config         ua_cfg;                /**< UA config.         */
     unsigned             call_cnt;              /**< Call counter.      */
-    pjsua_call           calls[PJSUA_MAX_CALLS];/**< Calls array.       */
+    pjsua_call          *calls;                 /**< Calls array.       */
     pjsua_call_id        next_call_id;          /**< Next call id to use*/
 
     /* Buddy; */
@@ -581,6 +632,19 @@ struct pjsua_data
     /* File recorders: */
     unsigned             rec_cnt;   /**< Number of file recorders.      */
     pjsua_file_data      recorder[PJSUA_MAX_RECORDERS];/**< Array of recs.*/
+
+#if PJSUA_HAS_VIDEO
+    /* AVI file players: */
+    pjmedia_vid_dev_factory *avi_factory;      /**< AVI player factory.       */
+    unsigned                 avi_player_cnt;    /**< Number of avi players.   */
+    pjsua_avi_player_data    avi_player[PJSUA_MAX_AVI_PLAYERS];/**< Array of
+                                                                 avi players. */
+
+    /* AVI file recorders: */
+    unsigned                  avi_rec_cnt;   /**< Number of avi recorders.    */
+    pjsua_avi_recorder_data   avi_recorder[PJSUA_MAX_AVI_RECORDERS];/**< Array 
+                                                             of avi recorders.*/
+#endif
 
     /* Video windows */
 #if PJSUA_HAS_VIDEO
@@ -772,6 +836,7 @@ void pjsua_ice_check_start_trickling(pjsua_call *call,
 pj_bool_t   pjsua_call_media_is_changing(pjsua_call *call);
 pj_status_t pjsua_call_media_init(pjsua_call_media *call_med,
                                   pjmedia_type type,
+                                  const pjmedia_sdp_session *rem_sdp,
                                   const pjsua_transport_config *tcfg,
                                   int security_level,
                                   int *sip_err_code,
@@ -929,6 +994,18 @@ void print_call(const char *title,
                 int call_id,
                 char *buf, pj_size_t size);
 
+char *pjsua_get_basename(const char *path, unsigned len);
+
+/*
+ * Internal function to reset avi player data
+ */
+void pjsua_reset_avi_player_data(pjsua_avi_player_id id);
+
+/*
+ * Internal function to reset avi recorder data
+ */
+void pjsua_reset_avi_recorder_data(pjsua_avi_rec_id id);
+
 /*
  * Audio
  */
@@ -964,6 +1041,16 @@ void pjsua_vid_win_reset(pjsua_vid_win_id wid);
 #endif
 
 /*
+ * Text
+ */
+void pjsua_txt_stop_stream(pjsua_call_media *call_med);
+pj_status_t pjsua_txt_channel_update(pjsua_call_media *call_med,
+                                     pj_pool_t *tmp_pool,
+                                     pjmedia_txt_stream_info *si,
+                                     const pjmedia_sdp_session *local_sdp,
+                                     const pjmedia_sdp_session *remote_sdp);
+
+/*
  * Schedule check for the need of re-INVITE/UPDATE after media update
  */
 void pjsua_call_schedule_reinvite_check(pjsua_call *call, unsigned delay_ms);
@@ -982,6 +1069,14 @@ pj_status_t pjsua_acc_handle_call_on_ip_change(pjsua_acc *acc);
  * End IP change process per account.
  */
 void pjsua_acc_end_ip_change(pjsua_acc *acc);
+
+/*
+ * Bridge callback: maps low-level auth challenge to pjsua on_auth_challenge.
+ */
+pj_bool_t pjsua_auth_on_challenge(
+                             pjsip_auth_clt_sess *sess,
+                             void *token,
+                             const pjsip_auth_clt_async_on_chal_param *param);
 
 PJ_END_DECL
 

@@ -118,6 +118,11 @@ typedef struct pjsip_tls_on_verify_param {
     const pj_sockaddr_t *remote_addr;
 
     /**
+     * Describes resolved server addresses.
+     */
+    const pjsip_server_addresses *server_addr;
+
+    /**
      * Describes transport direction.
      */
     pjsip_transport_dir tp_dir;
@@ -187,6 +192,22 @@ typedef struct pjsip_tls_setting
      * this setting will be ignored.
      */
     pj_ssl_cert_buffer privkey_buf;
+
+    /**
+     * Lookup certificate from OS certificate store with specified criteria.
+     *
+     * Currently only used by TLS backend Windows Schannel, please check
+     * pj_ssl_cert_load_from_store() for more info.
+     */
+    pj_ssl_cert_lookup_criteria cert_lookup;
+
+    /**
+     * TLS credentials using backend specific objects.
+     *
+     * Currently only used by TLS backend OpenSSL, please check
+     * pj_ssl_cert_load_direct() for more info.
+     */
+    pj_ssl_cert_direct cert_direct;
 
     /**
      * Password to open private key.
@@ -474,6 +495,9 @@ PJ_INLINE(void) pjsip_tls_setting_copy(pj_pool_t *pool,
     pj_strdup(pool, &dst->cert_buf, &src->cert_buf);
     pj_strdup(pool, &dst->privkey_buf, &src->privkey_buf);
 
+    pj_strdup_with_null(pool, &dst->cert_lookup.keyword,
+                              &src->cert_lookup.keyword);
+
     if (src->ciphers_num) {
         unsigned i;
         dst->ciphers = (pj_ssl_cipher*) pj_pool_calloc(pool, src->ciphers_num,
@@ -489,6 +513,8 @@ PJ_INLINE(void) pjsip_tls_setting_copy(pj_pool_t *pool,
         for (i=0; i<src->curves_num; ++i)
             dst->curves[i] = src->curves[i];
     }
+
+    pj_sockopt_params_clone(pool, &dst->sockopt_params, &src->sockopt_params);
 }
 
 
@@ -632,6 +658,39 @@ PJ_DECL(pj_status_t) pjsip_tls_transport_lis_start(pjsip_tpfactory *factory,
 PJ_DECL(pj_status_t) pjsip_tls_transport_restart(pjsip_tpfactory *factory,
                                                 const pj_sockaddr *local,
                                                 const pjsip_host_port *a_name);
+
+/**
+ * Restart the TLS listener with optional updated TLS settings. This will
+ * close the listener socket and recreate the socket. If new TLS settings
+ * are provided, they will be applied before creating the new socket,
+ * allowing runtime updates of certificates, keys, and other TLS parameters.
+ *
+ * @param factory       The SIP TLS transport factory.
+ *
+ * @param opt           Optional new TLS settings to be applied during restart.
+ *                      If NULL, the existing settings will be used (equivalent
+ *                      to calling pjsip_tls_transport_restart()).
+ *
+ * @param local         The address where the listener should be bound to.
+ *                      Both IP interface address and port fields are optional.
+ *                      If IP interface address is not specified, socket
+ *                      will be bound to PJ_INADDR_ANY. If port is not
+ *                      specified, socket will be bound to any port
+ *                      selected by the operating system.
+ *
+ * @param a_name        The published address for the listener.
+ *                      It can be set using IP address or hostname.
+ *                      If this argument is NULL, then the bound address will
+ *                      be used as the published address.
+ *
+ * @return              PJ_SUCCESS when the listener has been successfully
+ *                      restarted.
+ *
+ */
+PJ_DECL(pj_status_t) pjsip_tls_transport_restart2(pjsip_tpfactory *factory,
+                                                 const pjsip_tls_setting *opt,
+                                                 const pj_sockaddr *local,
+                                                 const pjsip_host_port *a_name);
 
 PJ_END_DECL
 

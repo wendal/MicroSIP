@@ -5,8 +5,8 @@
 
 .DESCRIPTION
     Builds tools\tls-selftest\tlstest.cpp against the same static pjproject
-    library MicroSIP links (third_party tree + lib\libpjproject-x86_64-x64-
-    vc14-<Configuration>-Static.lib) and runs it.
+    library MicroSIP links (third_party tree + lib\<Platform>\libpjproject-
+    <arch>-<plat>-vc14-<Configuration>-Static.lib) and runs it.
 
     The test asks pjsua to create a PJSIP_TRANSPORT_TLS transport, which makes
     pjlib build an OpenSSL SSL_CTX. A failure means the TLS backend is not
@@ -31,8 +31,15 @@ $Root = $RepoRoot
 if (-not $Source) { $Source = Join-Path $PSScriptRoot 'tls-selftest\tlstest.cpp' }
 if (-not (Test-Path $Source)) { throw "source not found: $Source" }
 
-$pjLib = Join-Path $Root "third_party\lib\libpjproject-x86_64-x64-vc14-$Configuration-Static.lib"
-if (-not (Test-Path $pjLib)) { throw "not found: $pjLib  (run build\build.ps1 first)" }
+# The pjproject archive lives in the per-platform folder: the shared
+# third_party\lib\ is searched *before* it and must stay free of
+# architecture specific archives (see BUILD.md section 11.3).
+$libDir = Join-Path $Root "third_party\lib\$Platform"
+$pjCands = @(Get-ChildItem $libDir -Filter "libpjproject-*-$Configuration-Static.lib" -File -ErrorAction SilentlyContinue)
+if (-not $pjCands.Count) {
+    throw "not found: libpjproject-*-$Configuration-Static.lib in $libDir  (run build\build.ps1 first)"
+}
+$pjLib = $pjCands[0].FullName
 
 $osslDir = Join-Path $Root "third_party\openssl\$Platform\$Configuration\lib"
 $opusDir = Join-Path $Root "third_party\opus\$Platform\$Configuration"
