@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Step 3 - build the pjproject static library for x64.
+    Step 3 - build the pjproject static library for every platform.
 
 .DESCRIPTION
     Builds upstream pjproject 2.17 (the archive in third_party\src) as
@@ -26,7 +26,7 @@
     which no longer ships. A global /p:BuildToolset overrides the props file.
 
 .EXAMPLE
-    .\03-pjproject.ps1 -Platform x64
+    .\03-pjproject.ps1 -Platform All
 #>
 [CmdletBinding()]
 param(
